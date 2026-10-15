@@ -199,6 +199,50 @@ fn actor_chain(chain: monaca_core::ActorChain) -> Rc<ActorChain> {
     })
 }
 
+/// Node provides the napi C ABI at dlopen time. A test binary links this crate as an rlib with
+/// no host process, so the three symbols the napi crate references would be undefined and the
+/// link fails — which is exactly what the first `cargo nextest run --workspace` hit. This
+/// crate's own tests never cross the FFI boundary (they exercise the pure conversions above),
+/// so these `cfg(test)` stubs keep the test target linkable. The shipped cdylib never sees
+/// them: they compile out of non-test builds, and the real symbols come from Node at load.
+/// The boundary itself is covered from JavaScript by `packages/core`'s test suite.
+#[cfg(test)]
+mod node_symbol_stubs {
+    use std::ffi::c_void;
+
+    use napi::sys::{
+        napi_env, napi_ref, napi_status, napi_threadsafe_function,
+        napi_threadsafe_function_call_mode, Status,
+    };
+
+    /// napi_reference_unref — report a zero count: there is no reference to unref.
+    #[no_mangle]
+    pub unsafe extern "C" fn napi_reference_unref(
+        _env: napi_env,
+        _ref: napi_ref,
+        result: *mut u32,
+    ) -> napi_status {
+        if !result.is_null() {
+            *result = 0;
+        }
+        Status::napi_ok
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn napi_delete_reference(_env: napi_env, _ref: napi_ref) -> napi_status {
+        Status::napi_ok
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn napi_call_threadsafe_function(
+        _func: napi_threadsafe_function,
+        _data: *mut c_void,
+        _is_blocking: napi_threadsafe_function_call_mode,
+    ) -> napi_status {
+        Status::napi_ok
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

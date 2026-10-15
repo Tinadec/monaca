@@ -93,6 +93,7 @@ pub fn scope_satisfies(granted: &[String], required: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Decision;
 
     fn scopes(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
