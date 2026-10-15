@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn subject_types_are_the_contract_values() {
         let schema = event_schema("tool.invoked");
-        let types: Vec<&str> = schema["properties"]["subject"]["type"]["enum"]
+        let types: Vec<&str> = schema["properties"]["subject"]["properties"]["type"]["enum"]
             .as_array()
             .expect("enum")
             .iter()

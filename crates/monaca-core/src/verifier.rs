@@ -202,9 +202,28 @@ impl Verifier {
             .unwrap_or_default();
 
         // §4.3: `iat` implausibly ahead of now is MONACA_TOKEN_NOT_YET_VALID. jsonwebtoken
-        // validates `nbf` but has no `iat` check, and a future `iat` is how a stolen token gets
-        // an extended life on a verifier whose clock is behind, so it is checked here.
-        self.check_iat(iat)?;
+        // has no `iat` check, and a future `iat` is how a stolen token gets an extended life
+        // on a verifier whose clock is behind, so it is checked here.
+        let now = self.clock.now().unix_timestamp();
+        let skew = i64::try_from(self.options.clock_skew_secs).unwrap_or(i64::MAX);
+
+        // exp — expired when `now` is past `exp` by more than the skew (RFC 7519 §4.1.4 with
+        // the contract's leeway). Checked against the injected clock; see `validation_for`.
+        if exp < now.saturating_sub(skew) {
+            return Err(TokenError::new(ErrorCode::Expired, "token has expired"));
+        }
+
+        // nbf — a token minted for later must wait; absent means "valid from signature".
+        if let Some(nbf) = claims.nbf {
+            if nbf > now.saturating_add(skew) {
+                return Err(TokenError::new(
+                    ErrorCode::NotYetValid,
+                    format!("token `nbf` ({nbf}) is more than {skew}s ahead of now ({now})"),
+                ));
+            }
+        }
+
+        self.check_iat(iat, now, skew)?;
 
         Ok(VerifiedToken {
             iss: iss.to_owned(),
@@ -224,10 +243,9 @@ impl Verifier {
     /// Reject an `iat` that is implausibly ahead of this verifier's clock — §4.3.
     ///
     /// The tolerance is the configured skew, so a token minted by a server whose clock runs
-    /// slightly fast still verifies, while one minted far in the future does not.
-    fn check_iat(&self, iat: i64) -> Result<(), TokenError> {
-        let now = self.clock.now().unix_timestamp();
-        let skew = i64::try_from(self.options.clock_skew_secs).unwrap_or(i64::MAX);
+    /// slightly fast still verifies, while one minted far in the future does not. `now` and
+    /// `skew` are passed in so every time check in one verification observes the same instant.
+    fn check_iat(&self, iat: i64, now: i64, skew: i64) -> Result<(), TokenError> {
         // `saturating_add` so an absurd `iat` cannot wrap into the past and pass.
         let limit = now.saturating_add(skew);
         if iat > limit {
@@ -239,12 +257,20 @@ impl Verifier {
         Ok(())
     }
 
-    /// The `Validation` handed to jsonwebtoken.
+    /// The `Validation` jsonwebtoken decodes with.
+    ///
+    /// Signature, issuer and the presence of `exp` are left to jsonwebtoken; the time claims are
+    /// NOT: jsonwebtoken reads the wall clock for `exp`/`nbf` and offers no way to inject one,
+    /// while this verifier's contract (§4.2) is that every time check reads the injected
+    /// [`Clock`] — that is what lets a test pin "now" instead of sleeping. `exp`/`nbf` are
+    /// therefore checked by hand in [`Verifier::verify_access_token`].
     fn validation_for(&self, expected_issuer: &str) -> Validation {
         let mut validation = Validation::new(Algorithm::ES256);
+        // The leeway only governs what jsonwebtoken still validates — the issuer. The manual
+        // time checks below apply the same skew themselves.
         validation.leeway = self.options.clock_skew_secs;
-        validation.validate_exp = true;
-        validation.validate_nbf = true;
+        validation.validate_exp = false;
+        validation.validate_nbf = false;
         // `aud` is checked above so that a mismatch reports MONACA_TOKEN_AUDIENCE_MISMATCH with
         // the audience named; letting jsonwebtoken do it too would only turn a good error into a
         // worse one.

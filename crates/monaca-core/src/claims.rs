@@ -110,6 +110,10 @@ pub(crate) struct AccessTokenClaims {
     pub jti: Option<String>,
     #[serde(default)]
     pub iat: Option<i64>,
+    /// Not-before, seconds since the epoch. Optional per RFC 7519 §4.1.5: a token without one
+    /// is valid from the moment the signature checks out.
+    #[serde(default)]
+    pub nbf: Option<i64>,
     #[serde(default)]
     pub exp: Option<i64>,
 }

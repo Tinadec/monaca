@@ -64,13 +64,21 @@ mod tests {
     use crate::event::{AuditActor, AuditDecision, AuditEvent, AuditSubject};
     use monaca_types::{AccountId, EventId};
     use time::OffsetDateTime;
+    use uuid::Uuid;
 
+    /// The event ids are pinned: the canonicalization tests below compare two separately built
+    /// events, and a fresh `EventId::new()`/`AccountId::new()` would make those bytes differ for
+    /// reasons that have nothing to do with member order or number spelling.
     fn event(action: &str, payload: serde_json::Value) -> AuditEvent {
         AuditEvent {
-            id: EventId::new(),
+            id: EventId::from_uuid(
+                Uuid::parse_str("00000000-0000-7000-8000-000000000000").expect("uuid"),
+            ),
             at: OffsetDateTime::from_unix_timestamp(1_767_225_600).expect("timestamp"),
             action: action.into(),
-            actor_chain: vec![AuditActor::account(AccountId::new())],
+            actor_chain: vec![AuditActor::account(AccountId::from_uuid(
+                Uuid::parse_str("01890a5d-ac96-774b-bcce-b302099a8057").expect("uuid"),
+            ))],
             subject: AuditSubject {
                 subject_type: AuditActorType::Tool,
                 id: None,

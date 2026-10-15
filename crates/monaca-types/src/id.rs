@@ -418,12 +418,12 @@ mod tests {
         );
         // A symbol outside the alphabet (`i`, `l`, `o`, `u` are excluded on purpose).
         assert_eq!(
-            TenantId::parse("ten_i1h455vb4pex5vsknk084sn02").expect_err("bad symbol"),
+            TenantId::parse("ten_i1h455vb4pex5vsknk084sn02q").expect_err("bad symbol"),
             TypedIdError::Alphabet('i')
         );
         // First symbol above 7 sets padding bits.
         assert_eq!(
-            TenantId::parse("ten_z1h455vb4pex5vsknk084sn02").expect_err("padding"),
+            TenantId::parse("ten_z1h455vb4pex5vsknk084sn02q").expect_err("padding"),
             TypedIdError::Padding
         );
         // No separator at all.
@@ -452,9 +452,13 @@ mod tests {
 
     #[test]
     fn the_all_zeros_and_all_ones_vectors_are_not_valid_keys() {
-        // §5.2's vectors must round-trip through the codec, but neither UUID is a v7, so
-        // neither may be accepted as an identifier.
-        for (uuid, suffix) in VECTORS {
+        // §5.2's vectors round-trip through the codec, but neither UUID is a v7, so neither may
+        // be accepted as an identifier. The third vector is a real v7 and stays valid — it is
+        // covered by `suffix_round_trips_every_vector` and `typed_id_round_trips`.
+        for (uuid, suffix) in [
+            ("00000000-0000-0000-0000-000000000000", "00000000000000000000000000"),
+            ("ffffffff-ffff-ffff-ffff-ffffffffffff", "7zzzzzzzzzzzzzzzzzzzzzzzzz"),
+        ] {
             let parsed = Uuid::parse_str(uuid).expect("vector uuid parses");
             assert_eq!(decode_suffix(suffix).expect("codec is total"), parsed);
             assert!(
