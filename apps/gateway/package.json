@@ -1,0 +1,26 @@
+{
+  "name": "@monaca/gateway",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Hono-on-Bun gateway: module host, console BFF, JWKS sync, dev proxy",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/main.ts",
+    "start": "bun src/main.ts",
+    "build": "bun build ./src/main.ts --target=bun --outdir=dist --external=@monaca/core",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "bun test --pass-with-no-tests"
+  },
+  "dependencies": {
+    "@monaca/core": "workspace:*",
+    "@monaca/kernel": "workspace:*",
+    "@monaca/mcp": "workspace:*",
+    "@monaca/module-mcp-demo": "workspace:*",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@monaca/tsconfig": "workspace:*"
+  }
+}

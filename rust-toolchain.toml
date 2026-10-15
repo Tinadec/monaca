@@ -1,0 +1,6 @@
+[toolchain]
+# The toolchain is floating stable on purpose: MSRV is enforced by
+# [workspace.package] rust-version in Cargo.toml, not by pinning CI to an old release.
+channel = "stable"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

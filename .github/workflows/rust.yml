@@ -1,0 +1,449 @@
+# Rust: format, lint, unit/integration tests on PostgreSQL 18, release builds for both
+# targets, contract codegen and the e2e smoke test.
+#
+# Contract: docs/contracts/m0.md §10.1. Rust is compiled ONLY here — the development
+# machine has no toolchain — so this workflow is the authority on whether the crates
+# compile, and every artifact below is either an acceptance input (the server binary, the
+# napi .node) or a committed generated file (index.d.ts, spec/).
+#
+# Artifact naming is the interface with `bun run fetch:native` (§10.5); renaming one of
+# these means editing scripts/fetch-native.ts in the same change.
+name: rust
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: &skip-non-rust
+      - "docs/**"
+      - "**/*.md"
+  pull_request:
+    paths-ignore: *skip-non-rust
+  workflow_dispatch:
+
+# A docs-only change never reaches this workflow. A TS-only change does, when it is pushed
+# together with Rust edits: `paths-ignore` cannot express "none of these files changed".
+# Per-crate paths filters live in each job below.
+concurrency:
+  group: rust-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # windows-latest ships a Debug-optimized toolchain; nothing here needs DWARF and the
+  # cache is measured in GB.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  # ---------------------------------------------------------------------------------------
+  # Formatting is non-fatal on branches and fatal on main: no contributor can run
+  # `cargo fmt` locally, so the fix path is the uploaded patch, not a red build (§10.1).
+  # ---------------------------------------------------------------------------------------
+  check:
+    name: check (fmt + clippy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: check
+
+      - name: cargo fmt --all (writes; never --check)
+        run: cargo fmt --all
+
+      - name: Collect the rustfmt diff
+        id: fmt
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "formatted=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "formatted=1" >> "$GITHUB_OUTPUT"
+            git diff > rustfmt.patch
+            echo "::warning::cargo fmt changed files; apply them locally with: bun run fetch:native --fmt"
+          fi
+
+      - name: Upload rustfmt-patch
+        if: steps.fmt.outputs.formatted == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustfmt-patch
+          path: rustfmt.patch
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Fail when main is not formatted
+        if: steps.fmt.outputs.formatted == '1' && github.ref == 'refs/heads/main'
+        run: |
+          echo "::error::rustfmt produced changes; fix them with: bun run fetch:native --fmt"
+          exit 1
+
+      # No -D warnings during M0 bootstrap: the workspace declares its lint set in
+      # [workspace.lints] and a new warning should not block an unrelated change.
+      - name: cargo clippy --workspace --all-targets
+        run: cargo clippy --workspace --all-targets
+
+  # ---------------------------------------------------------------------------------------
+  # Every query is covered by #[sqlx::test] against a real PostgreSQL 18 (§12). No service
+  # password: the runner connects to the trust-authenticated port over TCP.
+  # ---------------------------------------------------------------------------------------
+  test:
+    name: test (nextest on postgres:18)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+      # #[sqlx::test] provisions its own scratch databases from this admin DSN.
+      MONACA_ADMIN_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+      MONACA_CONTROL_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/monaca_control
+      MONACA_ENV: ci
+      RUST_BACKTRACE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: Wait for postgres
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h 127.0.0.1 -p 5432 -U postgres && exit 0
+            sleep 2
+          done
+          echo "::error::postgres:18 did not become ready"
+          exit 1
+
+      - name: cargo nextest run --workspace
+        run: cargo nextest run --workspace --no-fail-fast
+
+  # ---------------------------------------------------------------------------------------
+  # Release build matrix. Produces the two artifact families fetch:native consumes: the
+  # server executable and the napi .node. The binding is built through the package.json
+  # script so `--no-js` can never be dropped by a workflow edit and clobber the committed
+  # hand-written loader (§2.4).
+  # ---------------------------------------------------------------------------------------
+  build:
+    name: build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: server-x86_64-unknown-linux-gnu
+            binding-artifact: binding-x86_64-unknown-linux-gnu
+            server-bin: target/x86_64-unknown-linux-gnu/release/monaca-server
+          - name: windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: server-x86_64-pc-windows-msvc
+            binding-artifact: binding-x86_64-pc-windows-msvc
+            server-bin: target/x86_64-pc-windows-msvc/release/monaca-server.exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.x
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: build-${{ matrix.target }}
+
+      # napi-rs needs the Rust target directory to land in the workspace root even though
+      # it is invoked from packages/core; CARGO_BUILD_TARGET makes cargo and the CLI agree.
+      #
+      # Installed from the repository root on purpose: bun install resolves the workspace from
+      # the nearest package.json, so running it inside packages/core installs the whole
+      # workspace anyway — but with a confusing path and no frozen-lockfile guarantee that the
+      # root lockfile was the input.
+      - name: Install JS dependencies
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: bun install --frozen-lockfile
+
+      - name: cargo build --release (monaca-server)
+        run: cargo build --release -p monaca-server --target ${{ matrix.target }}
+
+      - name: napi build --release (monaca-core)
+        working-directory: packages/core
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          bun run build -- \
+            --target ${{ matrix.target }} \
+            --manifest-path ../../crates/monaca-napi/Cargo.toml \
+            --output-dir .
+
+      - name: Upload the server binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.server-bin }}
+          if-no-files-found: error
+
+      # `*.node` is git-ignored, so a glob is unambiguous here.
+      - name: Upload the napi binding
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binding-artifact }}
+          path: packages/core/*.node
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------------------
+  # Contract generation. Stage 0 has no Rust crate yet, so a failure here is expected until
+  # the crates land; the job is still written as if it succeeds, because the drift check and
+  # the `codegen` artifact are what fetch:native and the image build depend on.
+  # ---------------------------------------------------------------------------------------
+  codegen:
+    name: codegen (index.d.ts + openapi + event schemas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.x
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: codegen
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      # Same invocation as the build matrix, minus --no-js: the generated index.js is
+      # deliberately discarded below (§2.4).
+      #
+      # NOT the packages/core `build` script: that one passes `--no-js` and exists to protect
+      # the committed hand-written loader from a build. This job is the one place the
+      # generated declarations are allowed to exist, so it spells the flags out itself.
+      - name: napi build --dts (monaca-core declarations)
+        working-directory: packages/core
+        run: |
+          bunx napi build --release --platform \
+            --manifest-path ../../crates/monaca-napi/Cargo.toml \
+            --output-dir . \
+            --dts index.d.ts
+          rm -f index.js
+
+      - name: monaca-server openapi → spec/openapi.json
+        run: |
+          mkdir -p spec/events
+          cargo run --quiet --release -p monaca-server -- openapi > spec/openapi.json
+
+      - name: Event JSON Schemas → spec/events/
+        run: |
+          # The subcommand owns the directory contents; a stale schema must not survive a
+          # rename of an action name (§8.1).
+          rm -rf spec/events
+          cargo run --quiet --release -p monaca-server -- openapi events --out spec/events
+
+      # Bootstrap policy (§10.6): the hand-written placeholder in packages/core/index.d.ts
+      # is expected to differ from the first generated copy, so a diff WARNS until the
+      # generated version is committed; on main afterwards it fails.
+      - name: Drift check (generated files vs committed)
+        id: drift
+        shell: bash
+        run: |
+          git add -N packages/core/index.d.ts spec/openapi.json spec/events
+          if git diff --quiet -- packages/core/index.d.ts spec/openapi.json spec/events; then
+            echo "drifted=0" >> "$GITHUB_OUTPUT"
+            echo "Generated files match the committed copies."
+          else
+            echo "drifted=1" >> "$GITHUB_OUTPUT"
+            git diff --stat -- packages/core/index.d.ts spec/openapi.json spec/events
+            echo "::warning::generated files drifted; refresh them with: bun run fetch:native"
+          fi
+
+      - name: Fail when main has drifted
+        if: steps.drift.outputs.drifted == '1' && github.ref == 'refs/heads/main'
+        run: |
+          echo "::error::generated files are out of date on main; run: bun run fetch:native"
+          exit 1
+
+      - name: Stage the codegen artifact
+        run: |
+          mkdir -p codegen-out
+          cp packages/core/index.d.ts codegen-out/index.d.ts
+          cp spec/openapi.json codegen-out/openapi.json
+          mkdir -p codegen-out/events
+          cp spec/events/*.json codegen-out/events/
+
+      - name: Upload codegen
+        uses: actions/upload-artifact@v4
+        with:
+          name: codegen
+          path: codegen-out/*
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------------------
+  # Stage 0: the built server starts and answers /healthz. Stage 1: the acceptance script.
+  # The e2e acceptance script does not exist yet, so that step is written but skipped with
+  # a warning instead of masking the stage-0 result.
+  # ---------------------------------------------------------------------------------------
+  e2e:
+    name: e2e (server smoke + acceptance)
+    needs: [build, codegen]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.codegen.result == 'success' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.x
+
+      - name: Download the linux server binary
+        uses: actions/download-artifact@v4
+        with:
+          name: server-x86_64-unknown-linux-gnu
+          path: .monaca/bin
+
+      - name: Download codegen
+        uses: actions/download-artifact@v4
+        with:
+          name: codegen
+          path: codegen-out
+
+      - name: Install the generated contracts
+        run: |
+          mkdir -p spec/events packages/core
+          cp codegen-out/openapi.json spec/openapi.json
+          cp -r codegen-out/events/. spec/events/
+          cp codegen-out/index.d.ts packages/core/index.d.ts
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Make the server binary executable
+        run: chmod +x .monaca/bin/monaca-server
+
+      - name: Migrate and bootstrap the CI database
+        env: &e2e-env
+          MONACA_ENV: ci
+          MONACA_SERVER_ADDR: 127.0.0.1:8081
+          MONACA_SERVER_URL: http://127.0.0.1:8081
+          MONACA_PUBLIC_BASE_URL: http://localhost:8080
+          MONACA_AUTH_UI_URL: http://localhost:5174
+          MONACA_CONTROL_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/monaca_control
+          MONACA_ADMIN_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+          MONACA_APP_DB_USER: monaca_app
+          MONACA_APP_DB_PASSWORD: monaca_app_ci
+          MONACA_DEV_KEK: 00000000000000000000000000000000000000000000000000000000000000ff
+          MONACA_INTERNAL_SECRET: ci-internal-secret
+          MONACA_BOOTSTRAP_ADMIN_EMAIL: admin@demo.localhost
+          MONACA_BOOTSTRAP_ADMIN_PASSWORD: monaca-ci-password
+          MONACA_BOOTSTRAP_ADMIN_CLIENT_SECRET: ci-admin-client-secret
+          MONACA_CONSOLE_CLIENT_SECRET: ci-console-client-secret
+          MONACA_MCP_DEMO_RESOURCE: http://localhost:8080/mcp/demo
+          MONACA_LOG_LEVEL: info
+        run: |
+          .monaca/bin/monaca-server migrate
+          .monaca/bin/monaca-server bootstrap
+
+      - name: Stage 0 — start the server and wait for /healthz
+        env: *e2e-env
+        run: |
+          mkdir -p .monaca/reports
+          .monaca/bin/monaca-server serve > .monaca/server.log 2>&1 &
+          echo $! > .monaca/server.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8081/healthz | tee .monaca/reports/healthz.json; then
+              echo "server is up after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::server never answered /healthz"
+          tail -n 200 .monaca/server.log
+          exit 1
+
+      - name: Stage 1 — bun run e2e:skeleton
+        env:
+          <<: *e2e-env
+          MONACA_E2E_BASE_URL: http://localhost:8080
+        run: |
+          if [ ! -f scripts/e2e/skeleton.ts ]; then
+            echo "::warning::scripts/e2e/skeleton.ts does not exist yet; skipping the acceptance script"
+            {
+              echo "{"
+              echo '  "skipped": true,'
+              echo '  "reason": "scripts/e2e/skeleton.ts is not implemented in this stage",'
+              echo "  \"healthz\": $(cat .monaca/reports/healthz.json)"
+              echo "}"
+            } > .monaca/reports/skeleton.json
+            exit 0
+          fi
+          bun run e2e:skeleton --base-url http://127.0.0.1:8081
+
+      - name: Stop the server
+        if: always()
+        run: |
+          if [ -f .monaca/server.pid ]; then kill "$(cat .monaca/server.pid)" 2>/dev/null || true; fi
+          echo "--- server log (tail) ---"
+          tail -n 200 .monaca/server.log 2>/dev/null || true
+
+      # `if: always()` so the report survives a failed acceptance run, and `overwrite: true`
+      # because the "Stage 1" step above rewrites skeleton.json in place when the acceptance
+      # script does not exist yet — upload-artifact@v4 refuses to upload a second time into the
+      # same artifact name, which would lose the whole report exactly when it matters.
+      - name: Upload e2e-report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            .monaca/reports/
+            .monaca/server.log
+          if-no-files-found: warn
+          overwrite: true
+          retention-days: 14

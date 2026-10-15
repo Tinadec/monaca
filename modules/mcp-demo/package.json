@@ -1,0 +1,29 @@
+{
+  "name": "@monaca/module-mcp-demo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Demo MCP server (Streamable HTTP) mounted at /mcp/demo",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "bun test --pass-with-no-tests"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@monaca/kernel": "workspace:*",
+    "@monaca/mcp": "workspace:*",
+    "hono": "^4.13.13",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@monaca/tsconfig": "workspace:*"
+  }
+}

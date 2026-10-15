@@ -1,0 +1,116 @@
+/**
+ * Audit event shapes and presentation helpers.
+ *
+ * These mirror docs/contracts/m0.md §8.1 exactly: the stored form is the event plus `seq`,
+ * `prev_hash` and `hash`, and the API list item carries all of them. Field names are the wire
+ * names (`snake_case`) on purpose — a rename here would silently desynchronize the console from
+ * the JSON Schema in `spec/events/`.
+ */
+
+export type AuditDecision = "allow" | "deny" | "info";
+
+export type AuditSubjectType =
+  | "account"
+  | "org"
+  | "agent"
+  | "agent_key"
+  | "grant"
+  | "client"
+  | "tool"
+  | "session"
+  | "tenant";
+
+export interface AuditActor {
+  type: AuditSubjectType;
+  id: string;
+}
+
+export interface AuditSubject {
+  type: AuditSubjectType;
+  /** A typed id (`acc_…`), or a bare tool name such as `list_notes`. */
+  id: string;
+}
+
+export interface AuditEvent {
+  seq: number;
+  id: string;
+  at: string;
+  action: string;
+  actor_chain: AuditActor[];
+  subject: AuditSubject;
+  decision: AuditDecision;
+  grant_id: string | null;
+  jti: string | null;
+  payload: Record<string, unknown>;
+  prev_hash: string;
+  hash: string;
+}
+
+export interface AuditChainHead {
+  seq: number;
+  hash: string;
+}
+
+export interface AuditIntegrity {
+  valid: boolean;
+  checked: number;
+  head: AuditChainHead;
+  first_broken: {
+    seq: number;
+    expected: string;
+    actual: string;
+    reason: "hash_mismatch" | "prev_hash_mismatch" | "seq_gap" | "head_mismatch";
+  } | null;
+}
+
+/** The M0 action set (§8.1). Anything outside it is shown verbatim but flagged as unexpected. */
+export const M0_ACTIONS = [
+  "account.created",
+  "org.member.added",
+  "agent.created",
+  "agent.key.registered",
+  "agent.key.revoked",
+  "grant.created",
+  "grant.revoked",
+  "agent.token.requested",
+  "agent.token.issued",
+  "agent.token.denied",
+  "tool.invoked",
+  "tool.denied",
+  "interaction.sign_in.succeeded",
+  "interaction.sign_in.failed",
+] as const;
+
+export function isKnownAction(action: string): boolean {
+  return (M0_ACTIONS as readonly string[]).includes(action);
+}
+
+export function truncateHash(hash: string, head = 12): string {
+  return hash.length > head ? `${hash.slice(0, head)}…` : hash;
+}
+
+/** `2026-01-01T00:10:00.000Z` → `00:10:00.000`, with the date shown only when it is not today. */
+export function formatEventTime(at: string, now: Date = new Date()): { time: string; date: string | null } {
+  const parsed = new Date(at);
+  if (Number.isNaN(parsed.getTime())) return { time: at, date: null };
+
+  const time = parsed.toISOString().slice(11, 23);
+  const sameDay =
+    parsed.getUTCFullYear() === now.getUTCFullYear() &&
+    parsed.getUTCMonth() === now.getUTCMonth() &&
+    parsed.getUTCDate() === now.getUTCDate();
+  return { time, date: sameDay ? null : parsed.toISOString().slice(0, 10) };
+}
+
+/** Human-readable label for a typed id: the id itself, shortened to `prefix_…suffix4`. */
+export function shortId(id: string): string {
+  const match = /^([a-z]+)_(.+)$/.exec(id);
+  if (!match) return id;
+  const [, prefix, suffix] = match;
+  return suffix && suffix.length > 6 ? `${prefix}_…${suffix.slice(-4)}` : id;
+}
+
+/** The subject label shown next to the action; a tool name is a bare string, not a typed id. */
+export function subjectLabel(subject: AuditSubject): string {
+  return subject.type === "tool" ? subject.id : shortId(subject.id);
+}

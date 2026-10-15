@@ -1,0 +1,22 @@
+[package]
+name = "monaca-audit"
+description = "Per-organization audit hash chain: RFC 8785 canonicalization, the chain primitive and the verifier."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+monaca-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_jcs = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,277 @@
+@import "tailwindcss";
+
+/* Tailwind scans this package's own sources as well as the consuming app's. */
+@source "./";
+
+/* Monaca console theming.
+ *
+ * Cool ink-slate neutrals, one petrol-teal brand colour that carries every interactive affordance,
+ * and four semantic hues (allow / deny / info / warn) that only ever encode a decision or risk.
+ * Components use semantic names (paper / surface / ink / rule / brand / allow / deny) and never a
+ * literal colour, so theming is a handful of custom properties.
+ *
+ * Per-tenant branding hook: the brand is derived from two numbers, --brand-h (hue, degrees) and
+ * --brand-c (chroma). Set them on <html> (inline style) and focus rings, buttons, scope chips and
+ * the delegation chain all follow in both themes. Any individual --brand-* value can also be
+ * overridden directly for a fixed corporate colour.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei UI", "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-on: var(--brand-on);
+
+  --color-allow: var(--allow);
+  --color-allow-soft: var(--allow-soft);
+  --color-deny: var(--deny);
+  --color-deny-soft: var(--deny-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
+
+:root {
+  color-scheme: light;
+
+  --brand-h: 215;
+  --brand-c: 0.085;
+
+  --paper: oklch(0.972 0.004 230);
+  --surface: oklch(1 0 0);
+  --surface-muted: oklch(0.955 0.006 230);
+  --ink: oklch(0.22 0.025 245);
+  --ink-muted: oklch(0.46 0.02 245);
+  --ink-faint: oklch(0.62 0.015 245);
+  --rule: oklch(0.91 0.008 235);
+  --rule-strong: oklch(0.84 0.012 235);
+
+  --brand: oklch(0.5 var(--brand-c) var(--brand-h));
+  --brand-ink: oklch(0.38 calc(var(--brand-c) * 0.9) var(--brand-h));
+  --brand-soft: oklch(0.955 calc(var(--brand-c) * 0.22) var(--brand-h));
+  --brand-on: oklch(0.99 0.004 var(--brand-h));
+
+  --allow: oklch(0.5 0.11 152);
+  --allow-soft: oklch(0.95 0.03 152);
+  --deny: oklch(0.5 0.16 25);
+  --deny-soft: oklch(0.955 0.03 25);
+  --info: oklch(0.5 0.1 265);
+  --info-soft: oklch(0.955 0.025 265);
+  --warn: oklch(0.52 0.11 70);
+  --warn-soft: oklch(0.96 0.04 85);
+
+  --shadow-pop: 0 18px 40px -18px oklch(0.22 0.03 245 / 0.35), 0 1px 2px oklch(0.22 0.03 245 / 0.08);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --paper: oklch(0.175 0.018 245);
+  --surface: oklch(0.215 0.02 245);
+  --surface-muted: oklch(0.255 0.02 245);
+  --ink: oklch(0.94 0.008 235);
+  --ink-muted: oklch(0.74 0.015 240);
+  --ink-faint: oklch(0.6 0.018 245);
+  --rule: oklch(0.3 0.02 245);
+  --rule-strong: oklch(0.38 0.022 245);
+
+  --brand: oklch(0.76 var(--brand-c) var(--brand-h));
+  --brand-ink: oklch(0.86 calc(var(--brand-c) * 0.8) var(--brand-h));
+  --brand-soft: oklch(0.27 calc(var(--brand-c) * 0.45) var(--brand-h));
+  --brand-on: oklch(0.2 0.02 var(--brand-h));
+
+  --allow: oklch(0.76 0.13 152);
+  --allow-soft: oklch(0.28 0.05 152);
+  --deny: oklch(0.74 0.14 25);
+  --deny-soft: oklch(0.28 0.06 25);
+  --info: oklch(0.76 0.09 265);
+  --info-soft: oklch(0.28 0.05 265);
+  --warn: oklch(0.8 0.12 80);
+  --warn-soft: oklch(0.29 0.05 80);
+
+  --shadow-pop: 0 20px 44px -18px oklch(0 0 0 / 0.65), 0 1px 2px oklch(0 0 0 / 0.4);
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/instrument-sans-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/instrument-sans-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/jetbrains-mono-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/jetbrains-mono-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Identifiers, timestamps, hashes and scope strings are machine data: mono, tabular, tight. */
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--brand-soft);
+    color: var(--ink);
+  }
+
+  ::placeholder {
+    color: var(--ink-faint);
+  }
+}
+
+@utility mono-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* A thin, quiet scrollbar: the console is dense and scrollbars should not shout. */
+@utility scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+
+  &::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--rule);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--rule-strong);
+  }
+}
+
+@keyframes monaca-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes monaca-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+}
+
+@keyframes monaca-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes monaca-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@utility animate-fade-in {
+  animation: monaca-fade-in 140ms ease-out;
+}
+
+@utility animate-pop-in {
+  animation: monaca-pop-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility animate-slide-down {
+  animation: monaca-slide-down 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility animate-toast-in {
+  animation: monaca-toast-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,21 @@
+[package]
+name = "monaca-policy"
+description = "Scope decisions for M0 and the Cedar policy entry points for M1."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+
+[features]
+# Cedar is M1 work. Declared now so the workspace has one answer and the feature name is
+# reserved, but the dependency is not pulled in until the policies table is actually used.
+cedar = []
+
+[lints]
+workspace = true

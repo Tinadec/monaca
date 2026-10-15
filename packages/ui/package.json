@@ -1,0 +1,37 @@
+{
+  "name": "@monaca/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "shadcn-vue components, design tokens and Monaca domain components",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./styles.css": "./src/styles.css",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "test": "bun test --pass-with-no-tests"
+  },
+  "dependencies": {
+    "@vueuse/core": "^15.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-vue-next": "^1.0.0",
+    "reka-ui": "^2.11.0",
+    "tailwind-merge": "^3.7.0",
+    "vue": "^3.5.44"
+  },
+  "devDependencies": {
+    "@monaca/tsconfig": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.13"
+  }
+}

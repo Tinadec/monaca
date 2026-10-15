@@ -1,0 +1,13 @@
+{
+  "extends": "@monaca/tsconfig/vue",
+  "compilerOptions": {
+    "types": [
+      "bun"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "src/**/*.d.ts"
+  ]
+}

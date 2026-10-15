@@ -1,0 +1,27 @@
+[package]
+name = "monaca-napi"
+description = "napi-rs v3 bindings exposing the I/O-free core to @monaca/core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+# A cdylib is what the Node/Bun loader requires; the rlib is what lets `cargo test` link the
+# crate's own unit tests. Without the rlib, `cargo nextest run --workspace` cannot build the
+# test harness for this package at all.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+monaca-core = { workspace = true }
+napi = { workspace = true }
+napi-derive = { workspace = true }
+
+[build-dependencies]
+napi-build = { workspace = true }
+
+[lints]
+workspace = true

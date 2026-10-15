@@ -1,0 +1,59 @@
+# monaca-server — release binary on a slim runtime.
+#
+# Contract: docs/contracts/m0.md §10.3. Built by .github/workflows/image.yml and run by
+# deploy/compose.dev.yml on the dev VPS. The Rust toolchain never touches a developer
+# machine, so this file is one of only two places the server is compiled for linux (the
+# other is rust.yml's `build (linux)` job).
+
+# ---------------------------------------------------------------------------------------------
+# Stage 1: compile. `rust:1-bookworm` already carries gcc + libc6-dev, which is everything a
+# musl-free x86_64-unknown-linux-gnu build of sqlx/ring needs.
+# ---------------------------------------------------------------------------------------------
+FROM rust:1-bookworm AS build
+
+WORKDIR /app
+
+# The cargo registry and target directory are cache mounts, not layers: a source-only change
+# invalidates the COPY below, and these mounts are what keep that rebuild incremental instead
+# of a from-scratch compile of the whole dependency tree.
+COPY Cargo.toml rust-toolchain.toml ./
+COPY crates ./crates
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
+    cargo build --release -p monaca-server \
+ && cp target/release/monaca-server /usr/local/bin/monaca-server
+
+# ---------------------------------------------------------------------------------------------
+# Stage 2: runtime. No toolchain, no sources — one static-ish binary and a CA bundle.
+# ---------------------------------------------------------------------------------------------
+FROM debian:bookworm-slim AS runtime
+
+# sqlx is configured with tls-rustls-ring-webpki, so the container must be able to find roots
+# for any outbound TLS (OTLP exporter, future KMS KeyProvider). Without this the failure is a
+# runtime TLS error, not a build error.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates; \
+    rm -rf /var/lib/apt/lists/*; \
+    groupadd --system --gid 10001 monaca; \
+    useradd --system --uid 10001 --gid monaca --no-create-home --shell /usr/sbin/nologin monaca
+
+COPY --from=build /usr/local/bin/monaca-server /usr/local/bin/monaca-server
+
+# MONACA_SERVER_ADDR's dev default is 127.0.0.1:8081 (§2.2), which is unreachable from the
+# gateway container. Inside an image the bind address must be the wildcard; compose sets the
+# same value explicitly so this default is only a safety net.
+ENV MONACA_SERVER_ADDR=0.0.0.0:8081 \
+    MONACA_LOG_LEVEL=info \
+    MONACA_LOG_FORMAT=json
+
+USER monaca
+
+# Never the public origin (§2.1): the gateway publishes :8080 and proxies here.
+EXPOSE 8081
+
+# `serve` is the long-running subcommand; migrate/bootstrap are one-shot and run as separate
+# compose services so a restart can never re-run them.
+ENTRYPOINT ["/usr/local/bin/monaca-server"]
+CMD ["serve"]

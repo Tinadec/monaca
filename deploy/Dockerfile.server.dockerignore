@@ -1,0 +1,39 @@
+# Build context for deploy/Dockerfile.server.
+#
+# Dockerfile-specific: this file only applies when the build uses `--file
+# deploy/Dockerfile.server`, and it takes precedence over a root .dockerignore. It exists
+# because the server stage only needs Cargo.toml, rust-toolchain.toml and crates/ — the whole
+# JS workspace is dead weight in the context and, worse, a changing apps/ file would
+# invalidate the COPY layer and force a full cargo rebuild on every frontend commit.
+#
+# Paths are relative to the context root (the repository root, as image.yml passes it).
+
+# Everything that cannot affect the Rust build.
+apps/
+packages/
+modules/
+scripts/
+docs/
+deploy/
+spec/
+.github/
+
+# Repository metadata and local state.
+.git/
+.gitignore
+.gitattributes
+.editorconfig
+.monaca/
+node_modules/
+target/
+
+# JS workspace manifests: only the Rust side is copied in.
+package.json
+bun.lock
+*.md
+
+# Editor and OS noise.
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

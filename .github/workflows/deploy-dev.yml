@@ -1,0 +1,139 @@
+# Mode B: deploy the images image.yml just pushed to a VPS over SSH + docker compose.
+#
+# Contract: docs/contracts/m0.md §10.4. The important property is the *skip*: mode B is the
+# default for contributors who only run the Vue apps, so this workflow must succeed and say
+# almost nothing when DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY are not configured. A red
+# run here would be indistinguishable from a broken deployment.
+name: deploy-dev
+
+on:
+  # Triggered by the image build rather than by the push, so a deploy can never race the
+  # registry: `workflow_run` gives us the image sha as a fact, not as a hope.
+  workflow_run:
+    workflows: [image]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: docker compose over SSH
+    runs-on: ubuntu-latest
+    # A failed or cancelled image build must not be deployed. The dispatch path is always
+    # allowed through: it exists precisely so a human can re-run a deploy.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
+      # A dispatch has no workflow_run payload; fall back to the sha being deployed at push time.
+      IMAGE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      # `secrets` is not available in a job-level `if:`, so the gate is an ordinary step and
+      # every later step is conditional on its output.
+      - name: Check whether a deploy target is configured
+        id: gate
+        run: |
+          missing=""
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY; do
+            eval "value=\${$name}"
+            if [ -z "$value" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "configured=0" >> "$GITHUB_OUTPUT"
+            echo "::notice::deploy-dev skipped: missing secret(s):$missing. Mode B needs no deploy target; nothing to do."
+            exit 0
+          fi
+          echo "configured=1" >> "$GITHUB_OUTPUT"
+
+      - name: Explain the skip
+        if: steps.gate.outputs.configured == '0'
+        run: |
+          {
+            echo "### deploy-dev: skipped"
+            echo
+            echo "No VPS is configured, so nothing was deployed. This is the expected state for a"
+            echo "checkout that only runs mode A (local full stack) or mode C (CI only)."
+            echo
+            echo "To enable mode B, set these repository secrets:"
+            echo
+            echo "| secret | meaning |"
+            echo "|---|---|"
+            echo "| \`DEPLOY_HOST\` | hostname or IP of the dev VPS (required) |"
+            echo "| \`DEPLOY_USER\` | ssh user (required) |"
+            echo "| \`DEPLOY_SSH_KEY\` | private key for that user (required) |"
+            echo "| \`DEPLOY_PORT\` | ssh port, default 22 |"
+            echo "| \`DEPLOY_PATH\` | directory holding \`compose.dev.yml\`, default \`/opt/monaca\` |"
+            echo "| \`DEPLOY_ENV_FILE\` | contents of the deployed \`.env\` (see \`deploy/compose.dev.yml\`) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.configured == '1'
+
+      - name: Start ssh-agent
+        if: steps.gate.outputs.configured == '1'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust the deploy host
+        if: steps.gate.outputs.configured == '1'
+        run: |
+          port="${DEPLOY_PORT:-22}"
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "$port" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Copy compose.dev.yml, remote-deploy.sh and the environment file
+        if: steps.gate.outputs.configured == '1'
+        run: |
+          set -euo pipefail
+          port="${DEPLOY_PORT:-22}"
+          path="${DEPLOY_PATH:-/opt/monaca}"
+          ssh -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$path'"
+          scp -P "$port" deploy/compose.dev.yml deploy/remote-deploy.sh "$DEPLOY_USER@$DEPLOY_HOST:$path/"
+          # The .env never enters the repository or the runner's log; it is streamed over ssh
+          # from a secret into a 0600 file on the host.
+          #
+          # Only written when DEPLOY_ENV_FILE is set: `printf '%s\n' "$EMPTY"` would truncate
+          # the host's existing .env to a single newline, turning a first-time bootstrap into
+          # an unrecoverable one.
+          if [ -z "$DEPLOY_ENV_FILE" ]; then
+            echo "::notice::DEPLOY_ENV_FILE is not set; leaving the host's existing .env untouched"
+          else
+            printf '%s\n' "$DEPLOY_ENV_FILE" \
+              | ssh -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" \
+                  "umask 077 && cat > '$path/.env' && chmod 600 '$path/.env'"
+          fi
+
+      - name: Pull, migrate and restart
+        if: steps.gate.outputs.configured == '1'
+        run: |
+          set -euo pipefail
+          port="${DEPLOY_PORT:-22}"
+          path="${DEPLOY_PATH:-/opt/monaca}"
+          ssh -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "set -eu; cd '$path'; \
+             export MONACA_SERVER_IMAGE='ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/monaca-server:${IMAGE_SHA}'; \
+             export MONACA_GATEWAY_IMAGE='ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/monaca-gateway:${IMAGE_SHA}'; \
+             bash remote-deploy.sh"
+
+      - name: Report the deployed commit
+        if: steps.gate.outputs.configured == '1'
+        run: |
+          {
+            echo "### deploy-dev: ${IMAGE_SHA}"
+            echo
+            echo "Deployed \`monaca-server\` and \`monaca-gateway\` at \`${IMAGE_SHA}\` to \`${DEPLOY_HOST}\`."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Monaca Vue app",
+  "extends": "./base.json",
+  "compilerOptions": {
+    // DOM is required by the Vite apps; @vueuse/core and @tanstack/vue-query assume it too.
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "bun"],
+    "jsx": "preserve",
+    "jsxImportSource": "vue"
+  }
+}

@@ -1,0 +1,148 @@
+# Mode B: the remote dev stack (docs/contracts/m0.md §3, §10.4).
+#
+# One compose file, three services, deployed to a VPS by .github/workflows/deploy-dev.yml.
+# The gateway is the single public origin (§2.1): the server binds inside the compose network
+# and is never published, so nothing a browser or an agent sees can name :8081.
+#
+#   cd deploy && docker compose --env-file .env -f compose.dev.yml up -d
+#
+# `deploy/.env` is written from the DEPLOY_ENV_FILE secret (mode 0600) and is never committed.
+# Required in it — compose fails loudly rather than defaulting a credential:
+#
+#   MONACA_PUBLIC_BASE_URL   https://dev.monaca.example   (mode B's public origin; every iss)
+#   POSTGRES_PASSWORD        password for the `monaca` role and the databases below
+#   MONACA_INTERNAL_SECRET   gateway -> server /internal/* shared secret
+#   MONACA_DEV_KEK           64 hex chars; MONACA_ENV=dev only
+#   MONACA_BOOTSTRAP_ADMIN_PASSWORD / MONACA_BOOTSTRAP_ADMIN_CLIENT_SECRET
+#   MONACA_APP_DB_PASSWORD   password of the monaca_app login role
+#
+# Set MONACA_SERVER_IMAGE / MONACA_GATEWAY_IMAGE to pin a commit; both default to :latest.
+
+name: monaca-dev
+
+services:
+  postgres:
+    # postgres:18 moved its data directory and its VOLUME declaration: the image now declares
+    # VOLUME /var/lib/postgresql with PGDATA=/var/lib/postgresql/18/docker. Mounting the old
+    # /var/lib/postgresql/data path would silently keep the data in an anonymous volume that a
+    # `docker compose down -v` does not remove.
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: monaca
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: monaca_control
+      # initdb options only apply on an empty volume; the app locale must be UTF-8 because
+      # every tenant schema stores emails and org slugs.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monaca -d monaca_control"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    # No `ports:` on purpose: the database is reachable only from the gateway and the
+    # one-shot provisioning services below.
+    networks: [monaca]
+
+  # `migrate` and `bootstrap` are separate one-shot services, not init logic inside `server`:
+  # a server restart must never re-run provisioning, and remote-deploy.sh invokes them
+  # explicitly before bringing the long-running services up (§5.4 — migrate resumes a
+  # half-finished tenant saga, so running it twice is defined behaviour, running it on every
+  # restart is not).
+  #
+  # Their depends_on is for a hand-run `docker compose up` on the host; remote-deploy.sh does
+  # not rely on it, because `docker compose run` does not reliably wait on a health condition.
+  migrate:
+    image: ${MONACA_SERVER_IMAGE:-ghcr.io/tinadec/monaca-server:latest}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: [.env]
+    environment:
+      MONACA_ENV: dev
+      MONACA_CONTROL_DATABASE_URL: postgres://monaca:${POSTGRES_PASSWORD}@postgres:5432/monaca_control
+      MONACA_ADMIN_DATABASE_URL: postgres://monaca:${POSTGRES_PASSWORD}@postgres:5432/postgres
+    command: ["migrate"]
+    networks: [monaca]
+
+  bootstrap:
+    image: ${MONACA_SERVER_IMAGE:-ghcr.io/tinadec/monaca-server:latest}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    env_file: [.env]
+    environment:
+      MONACA_ENV: dev
+      MONACA_CONTROL_DATABASE_URL: postgres://monaca:${POSTGRES_PASSWORD}@postgres:5432/monaca_control
+      MONACA_ADMIN_DATABASE_URL: postgres://monaca:${POSTGRES_PASSWORD}@postgres:5432/postgres
+    # Idempotent by contract (§5.6 seed rows); safe on every deploy.
+    command: ["bootstrap"]
+    networks: [monaca]
+
+  server:
+    image: ${MONACA_SERVER_IMAGE:-ghcr.io/tinadec/monaca-server:latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: [.env]
+    environment:
+      MONACA_ENV: dev
+      # The image defaults to 0.0.0.0:8081 too; restated because this is the value the
+      # gateway's MONACA_SERVER_URL must agree with.
+      MONACA_SERVER_ADDR: 0.0.0.0:8081
+      MONACA_CONTROL_DATABASE_URL: postgres://monaca:${POSTGRES_PASSWORD}@postgres:5432/monaca_control
+      MONACA_ADMIN_DATABASE_URL: postgres://monaca:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      MONACA_LOG_FORMAT: json
+    # Not published (§2.1). MONACA_SERVER_URL=http://server:8081 in .env is the only way to
+    # reach it, and that value never ends up in a token or a browser request.
+    expose: ["8081"]
+    healthcheck:
+      test: ["CMD-SHELL", "monaca-server --version >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [monaca]
+
+  gateway:
+    image: ${MONACA_GATEWAY_IMAGE:-ghcr.io/tinadec/monaca-gateway:latest}
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_started
+    env_file: [.env]
+    environment:
+      MONACA_ENV: dev
+      MONACA_GATEWAY_ADDR: 0.0.0.0:8080
+      # Server-to-server hop only (§2.1). The compose service name is the DNS name.
+      MONACA_SERVER_URL: http://server:8081
+      # Mode B's whole point: the deployed environment has no local Rust toolchain, no local
+      # PG and no local server, and the public origin is this container.
+      MONACA_DEV_PROXY: "1"
+    ports:
+      - "${MONACA_GATEWAY_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"const r=await fetch('http://127.0.0.1:8080/healthz');process.exit(r.ok?0:1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [monaca]
+
+volumes:
+  pgdata:
+    # A named volume, not a bind mount: the image's uid 999/`postgres` user must own the data
+    # directory, and a bind mount from a host directory the SSH user owns would not be.
+    name: monaca-dev-pgdata
+
+networks:
+  monaca:
+    name: monaca-dev

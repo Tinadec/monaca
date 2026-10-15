@@ -1,0 +1,25 @@
+{
+  "name": "@monaca/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monaca module system: defineModule, lifecycle, typed DI",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "bun test --pass-with-no-tests"
+  },
+  "dependencies": {
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@monaca/tsconfig": "workspace:*"
+  }
+}

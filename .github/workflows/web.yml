@@ -1,0 +1,82 @@
+# TypeScript half of CI: install from the lockfile, typecheck every workspace package,
+# unit-test, build the Vite apps.
+#
+# Contract: docs/contracts/m0.md §10.2. TypeScript 6.0.3 is pinned deliberately (§11.2) —
+# vue-tsc 3.3.13 needs `typescript/lib/tsc`, which TypeScript 7 no longer exports.
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "modules/**"
+      - "scripts/**"
+      - "spec/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig*.json"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "modules/**"
+      - "scripts/**"
+      - "spec/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig*.json"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: web-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# `bun install --frozen-lockfile` is passed on every install step rather than set once as a
+# BUN_FROZEN_LOCKFILE env var: that variable is not read by Bun, and a flag that silently does
+# nothing is worse than no flag.
+
+jobs:
+  web:
+    name: typecheck + test + build (bun)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.x
+
+      - name: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile
+
+      # Runs `bun run --filter '*' typecheck && tsc -p scripts/tsconfig.json`.
+      - name: bun run typecheck
+        run: bun run typecheck
+
+      # The native-vs-jose differential test (§10.6) lives in this command; it is skipped
+      # with a notice while packages/core has no fetched .node for this runner.
+      - name: bun test
+        run: bun test --pass-with-no-tests
+
+      - name: bun run build
+        run: bun run build
+
+      - name: Upload web-build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: |
+            apps/console/dist/
+            apps/auth-ui/dist/
+          # The Vite apps have no build output until their owners add index.html and a vite
+          # config; a missing dist/ is a notice, not a failure.
+          #
+          # apps/gateway is deliberately absent: its `build` script is a `bun build` bundle,
+          # and image.yml ships the gateway unbundled (Bun runs the TypeScript directly), so a
+          # bundle nobody consumes would only be a second thing to keep working.
+          if-no-files-found: warn
+          retention-days: 14

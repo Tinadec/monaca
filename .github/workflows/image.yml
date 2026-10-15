@@ -1,0 +1,144 @@
+# Container images for the remote dev environment (mode B).
+#
+# Contract: docs/contracts/m0.md §10.3 — main only, GHCR, tags `<sha>` + `latest`.
+# The images are what deploy-dev.yml runs on the VPS, so a broken image is a broken mode B;
+# nothing here is allowed to be "best effort" except the optional napi binding below.
+name: image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "packages/**"
+      - "modules/**"
+      - "apps/gateway/**"
+      - "package.json"
+      - "bun.lock"
+      - "deploy/**"
+      - ".github/workflows/image.yml"
+  workflow_dispatch:
+
+# Never cancel an in-flight image build: the deploy workflow keys off this run's conclusion,
+# and a cancelled run would leave `latest` pointing at the previous, unrelated commit.
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ---------------------------------------------------------------------------------------
+  # monaca-server: the Rust binary, built in a cargo stage and shipped on a slim runtime.
+  # This is the only place the server is compiled for linux outside rust.yml's artifact, and
+  # it is deliberately independent of that artifact so a mode-B deploy never depends on a
+  # developer having run fetch:native.
+  # ---------------------------------------------------------------------------------------
+  server:
+    name: build + push monaca-server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GHCR rejects uppercase repository owners; github.repository_owner is not lowercased.
+      - name: Resolve the image namespace
+        id: ns
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.ns.outputs.owner }}/monaca-server
+          tags: |
+            type=sha,format=long,prefix=
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.server
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=monaca-server
+          cache-to: type=gha,mode=max,scope=monaca-server
+
+  # ---------------------------------------------------------------------------------------
+  # monaca-gateway: the Bun workspace, unbuilt (Bun runs TypeScript directly).
+  # ---------------------------------------------------------------------------------------
+  gateway:
+    name: build + push monaca-gateway
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # The gateway imports @monaca/core, whose .node is a rust.yml artifact and not an npm
+      # package (§2.4). Pull the linux binding into the build context so the image carries a
+      # working verifier; while the crates are still landing the artifact does not exist yet
+      # and the gateway must still build, hence continue-on-error.
+      - name: Try to place the linux napi binding in the build context
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_id=$(gh run list --workflow rust.yml --branch main --status success --limit 1 \
+                     --json databaseId --jq '.[0].databaseId // empty')
+          if [ -z "$run_id" ]; then
+            echo "::notice::no successful rust.yml run on main yet; building the gateway without a native binding"
+            exit 0
+          fi
+          gh run download "$run_id" --name binding-x86_64-unknown-linux-gnu --dir packages/core
+          ls -l packages/core/*.node
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the image namespace
+        id: ns
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.ns.outputs.owner }}/monaca-gateway
+          tags: |
+            type=sha,format=long,prefix=
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.gateway
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=monaca-gateway
+          cache-to: type=gha,mode=max,scope=monaca-gateway

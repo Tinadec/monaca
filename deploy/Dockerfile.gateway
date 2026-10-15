@@ -1,0 +1,37 @@
+# monaca-gateway — the Bun workspace, shipped unbundled.
+#
+# Contract: docs/contracts/m0.md §10.3, §9. Built by .github/workflows/image.yml and run by
+# deploy/compose.dev.yml on the dev VPS.
+#
+# Deliberately not bundled: Bun executes TypeScript directly, so `bun install` + the source
+# tree *is* the artifact. Bundling would have to resolve @monaca/core's native binding at
+# build time and would hide workspace layout bugs that only appear in the deployed image.
+FROM oven/bun:1.3.14-slim
+
+# The base image declares a `bun` user (uid 1000) and /home/bun/app as its working directory;
+# running as it means the container never writes as root.
+WORKDIR /home/bun/app
+
+# The lockfile is the contract for actual versions (§11.2). The bun cache is a cache mount so
+# a source-only change does not re-download the tree.
+COPY --chown=bun:bun package.json bun.lock ./
+RUN --mount=type=cache,target=/home/bun/.bun/install/cache,sharing=locked,uid=1000,gid=1000 \
+    bun install --frozen-lockfile
+
+COPY --chown=bun:bun . .
+
+# A .node binding is a rust.yml artifact, not an npm package (§2.4), so it is only present
+# when image.yml managed to fetch one. Absent, @monaca/core throws MONACA_CORE_BINARY_MISSING
+# on first use; the gateway's JWKS verifier is the only thing that needs it.
+ENV NODE_ENV=production \
+    MONACA_GATEWAY_ADDR=0.0.0.0:8080 \
+    MONACA_LOG_LEVEL=info
+
+USER bun
+
+# The single public origin in every environment (§2.1).
+EXPOSE 8080
+
+# exec form: `bun run <file>` resolves workspace packages through the root node_modules tree
+# that the install above created.
+CMD ["bun", "run", "apps/gateway/src/main.ts"]

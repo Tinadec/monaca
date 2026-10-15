@@ -1,0 +1,136 @@
+# Monaca Rust workspace.
+#
+# Rust compiles in GitHub Actions only (see docs/contracts/m0.md §2 and §10). The local
+# machine has no Rust toolchain, so crate versions and features below are the contract:
+# change them here, never in a member crate.
+#
+# resolver = "3" pairs with edition 2024 (Cargo refuses "3" below edition 2024).
+# MSRV is driven by the strictest dep in the tree: sqlx 0.9 requires 1.94.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+rust-version = "1.94"
+authors = ["Monaca contributors"]
+repository = "https://github.com/monaca/monaca"
+publish = false
+
+[workspace.dependencies]
+# --- async runtime / http ---------------------------------------------------
+axum = { version = "0.8.9", default-features = false, features = [
+    # axum's defaults, spelled out, plus http2. Listing them explicitly means a future axum
+    # release changing its `default` set cannot silently remove something we rely on.
+    "form",
+    "http1",
+    "json",
+    "matched-path",
+    "original-uri",
+    "query",
+    "tokio",
+    "tower-log",
+    "tracing",
+    "http2",
+    "macros",
+] }
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "fs", "process"] }
+tower = { version = "0.5.3", features = ["util", "limit", "timeout"] }
+tower-http = { version = "0.7.1", features = ["trace", "cors", "limit", "timeout", "request-id", "sensitive-headers", "util"] }
+hyper = { version = "1.12.0", features = ["server", "http1", "http2"] }
+
+# --- storage ----------------------------------------------------------------
+# Runtime queries only (query_as + FromRow); the `macros` feature is deliberately
+# absent so nothing needs a compile-time DATABASE_URL or .sqlx offline bundle.
+sqlx = { version = "0.9.0", default-features = false, features = [
+    "postgres",
+    "runtime-tokio",
+    "tls-rustls-ring-webpki",
+    "uuid",
+    "time",
+    "json",
+    "migrate",
+    "derive",
+    "any",
+] }
+
+# --- serde / encoding -------------------------------------------------------
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_jcs = "0.2.0"
+uuid = { version = "1.28.0", features = ["v7", "v4", "serde", "std"] }
+time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macros", "std"] }
+data-encoding = "2.11.1"
+hex = "0.4.3"
+
+# --- crypto -----------------------------------------------------------------
+# rust_crypto keeps the RustCrypto backend (Windows friendly). aws_lc_rs is exposed
+# as a separate opt-in feature behind `monaca-crypto/fips`, never as the default.
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["use_pem", "rust_crypto"] }
+# p256 is pinned to 0.13 on purpose: jsonwebtoken 11.1.0 depends on p256 0.13.2, and
+# picking 0.14 here would compile two parallel RustCrypto stacks (p256 0.13/0.14,
+# sha2 0.10/0.11, elliptic-curve 0.13/0.14). One stack is one signature-compatibility
+# surface. Revisit only when jsonwebtoken moves to 0.14.
+p256 = { version = "0.13.2", default-features = false, features = ["ecdsa", "pkcs8", "jwk", "pem", "std", "serde"] }
+sha2 = "0.10.9"
+argon2 = { version = "0.6.0", features = ["std", "password-hash"] }
+subtle = "2.6.1"
+# p256 0.13's ecdsa 0.16 consumes rand_core 0.6 (SigningKey::random takes a rand_core 0.6
+# CryptoRngCore), so key generation uses rand_core 0.6 directly rather than rand 0.9.
+# Mixing rand 0.9 in here would mean a second getrandom/OsRng root for no benefit.
+rand_core = { version = "0.6.4", features = ["std", "getrandom"] }
+zeroize = { version = "1.9.1", features = ["derive"] }
+
+# --- errors / observability -------------------------------------------------
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt", "json", "time", "registry"] }
+clap = { version = "4.6.7", features = ["derive", "env", "wrap_help"] }
+
+# --- contracts --------------------------------------------------------------
+utoipa = { version = "6.0.0", features = ["axum_extras", "uuid", "time", "macros"] }
+utoipa-axum = "0.3.0"
+schemars = "1.2.3"
+
+# --- napi bindings ----------------------------------------------------------
+napi = { version = "3.14.2", default-features = false, features = ["napi4", "serde-json", "error_anyhow"] }
+napi-derive = "3.6.12"
+napi-build = "2.6.0"
+
+# --- policy (M1; declared now so the workspace has one answer) ---------------
+cedar-policy = "4.13.0"
+
+# --- internal crates --------------------------------------------------------
+monaca-types = { path = "crates/monaca-types" }
+monaca-crypto = { path = "crates/monaca-crypto" }
+monaca-store = { path = "crates/monaca-store" }
+monaca-oidc = { path = "crates/monaca-oidc" }
+monaca-agent = { path = "crates/monaca-agent" }
+monaca-policy = { path = "crates/monaca-policy" }
+monaca-audit = { path = "crates/monaca-audit" }
+monaca-core = { path = "crates/monaca-core" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[profile.dev]
+# Rust only builds in CI; keep dev builds (used by `cargo nextest` on ubuntu) quick.
+debug = 1
+
+[profile.dev.package."*"]
+opt-level = 1
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "warn"
+unwrap_used = "warn"

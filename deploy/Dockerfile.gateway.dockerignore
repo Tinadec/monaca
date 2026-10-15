@@ -1,0 +1,35 @@
+# Build context for deploy/Dockerfile.gateway.
+#
+# Dockerfile-specific: applies only when the build uses `--file deploy/Dockerfile.gateway`.
+# The gateway image installs the whole Bun workspace, so almost everything is wanted — what is
+# excluded is what would bloat the context or poison the install layer.
+
+# Repository metadata and local state. A stale host node_modules copied into the image would
+# shadow the linux install (Bun installs platform-specific binaries), and .monaca/ holds
+# fetched .node artifacts and a PostgreSQL data directory.
+.git/
+.monaca/
+node_modules/
+**/node_modules/
+target/
+
+# Local env files. `.env.example` is kept (it is documentation); a real .env must never reach
+# an image layer.
+.env
+.env.*
+!.env.example
+
+# The Rust side is not part of this image, and crates/ plus target/ are the largest things in
+# the context.
+crates/
+target/
+
+# Editor and OS noise.
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
