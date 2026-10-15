@@ -70,10 +70,7 @@ pub enum AttenuationError {
 ///
 /// This is the M0 single-hop form. M3's multi-hop exchange calls it once per hop, which is why
 /// it takes the parent as an argument instead of reading a chain.
-pub fn attenuate(
-    parent: &Permission,
-    child: &Permission,
-) -> Result<Permission, AttenuationError> {
+pub fn attenuate(parent: &Permission, child: &Permission) -> Result<Permission, AttenuationError> {
     for scope in &child.scopes {
         if !parent.scopes.contains(scope) {
             return Err(AttenuationError::ScopeNotHeld(scope.clone()));
@@ -104,7 +101,11 @@ pub fn attenuate(
     scopes.sort_unstable();
     scopes.dedup();
 
-    Ok(Permission { scopes, resource: parent.resource.clone(), expires_at })
+    Ok(Permission {
+        scopes,
+        resource: parent.resource.clone(),
+        expires_at,
+    })
 }
 
 #[cfg(test)]
@@ -141,7 +142,10 @@ mod tests {
         let parent = permission(&["tools:read"], RESOURCE);
         let child = permission(&["tools:read", "tools:write"], RESOURCE);
         let err = attenuate(&parent, &child).expect_err("must refuse");
-        assert_eq!(err, AttenuationError::ScopeNotHeld("tools:write".to_owned()));
+        assert_eq!(
+            err,
+            AttenuationError::ScopeNotHeld("tools:write".to_owned())
+        );
     }
 
     #[test]
@@ -165,7 +169,10 @@ mod tests {
             resource: RESOURCE.into(),
             expires_at: Some(base + time::Duration::seconds(600)),
         };
-        assert_eq!(attenuate(&parent, &child), Err(AttenuationError::ExpiryExtended));
+        assert_eq!(
+            attenuate(&parent, &child),
+            Err(AttenuationError::ExpiryExtended)
+        );
     }
 
     #[test]
@@ -195,7 +202,10 @@ mod tests {
             expires_at: Some(base),
         };
         let child = permission(&["tools:read"], RESOURCE);
-        assert_eq!(attenuate(&parent, &child).expect("narrows").expires_at, Some(base));
+        assert_eq!(
+            attenuate(&parent, &child).expect("narrows").expires_at,
+            Some(base)
+        );
     }
 
     #[test]
@@ -216,7 +226,10 @@ mod tests {
             };
             let result = attenuate(&parent, &child).expect("narrows");
             for scope in &result.scopes {
-                assert!(parent.scopes.contains(scope), "{scope} was not held by the parent");
+                assert!(
+                    parent.scopes.contains(scope),
+                    "{scope} was not held by the parent"
+                );
             }
         }
     }

@@ -30,7 +30,12 @@ impl ProblemKind {
         title: &'static str,
         status: u16,
     ) -> Self {
-        Self { slug, code, title, status }
+        Self {
+            slug,
+            code,
+            title,
+            status,
+        }
     }
 
     /// The `type` slug, e.g. `grant_revoked`.
@@ -131,8 +136,12 @@ impl Problem {
 mod tests {
     use super::*;
 
-    const GRANT_REVOKED: ProblemKind =
-        ProblemKind::new("grant_revoked", "MONACA_GRANT_REVOKED", "Grant revoked", 409);
+    const GRANT_REVOKED: ProblemKind = ProblemKind::new(
+        "grant_revoked",
+        "MONACA_GRANT_REVOKED",
+        "Grant revoked",
+        409,
+    );
 
     #[test]
     fn kind_exposes_its_contract_values() {
@@ -160,12 +169,18 @@ mod tests {
             value["instance"],
             "/v1/orgs/acme/grants/01920000-0000-7000-8000-000000000000"
         );
-        assert!(value["detail"].as_str().expect("detail").contains("was revoked at"));
+        assert!(
+            value["detail"]
+                .as_str()
+                .expect("detail")
+                .contains("was revoked at")
+        );
     }
 
     #[test]
     fn omitted_members_are_absent_not_null() {
-        let value = serde_json::to_value(Problem::without_detail(GRANT_REVOKED)).expect("serializes");
+        let value =
+            serde_json::to_value(Problem::without_detail(GRANT_REVOKED)).expect("serializes");
         assert!(value.get("detail").is_none(), "detail must be omitted");
         assert!(value.get("instance").is_none(), "instance must be omitted");
     }

@@ -138,14 +138,9 @@ mod tests {
     /// The CI workflow's exact invocation — `openapi events --out <dir>`.
     #[test]
     fn openapi_events_out_parses() {
-        let cli = Cli::try_parse_from([
-            "monaca-server",
-            "openapi",
-            "events",
-            "--out",
-            "spec/events",
-        ])
-        .expect("parses");
+        let cli =
+            Cli::try_parse_from(["monaca-server", "openapi", "events", "--out", "spec/events"])
+                .expect("parses");
 
         let Command::Openapi(args) = cli.command else {
             panic!("expected the openapi subcommand");

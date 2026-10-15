@@ -39,7 +39,10 @@ struct TestKey {
 
 impl TestKey {
     fn generate(kid: &str) -> Self {
-        Self { signing: SigningKey::random(&mut OsRng), kid: kid.to_owned() }
+        Self {
+            signing: SigningKey::random(&mut OsRng),
+            kid: kid.to_owned(),
+        }
     }
 
     fn verifying(&self) -> VerifyingKey {
@@ -83,14 +86,29 @@ fn header(kid: &str) -> String {
 fn claims_with(overrides: &[(&str, serde_json::Value)]) -> String {
     let mut map = serde_json::Map::new();
     map.insert("iss".into(), serde_json::json!(ISSUER));
-    map.insert("sub".into(), serde_json::json!("acc_00000000000000000000000000"));
+    map.insert(
+        "sub".into(),
+        serde_json::json!("acc_00000000000000000000000000"),
+    );
     map.insert("aud".into(), serde_json::json!(AUDIENCE));
-    map.insert("tid".into(), serde_json::json!("ten_00000000000000000000000000"));
-    map.insert("org".into(), serde_json::json!("org_00000000000000000000000000"));
+    map.insert(
+        "tid".into(),
+        serde_json::json!("ten_00000000000000000000000000"),
+    );
+    map.insert(
+        "org".into(),
+        serde_json::json!("org_00000000000000000000000000"),
+    );
     map.insert("scope".into(), serde_json::json!(["tools:read"]));
-    map.insert("jti".into(), serde_json::json!("01920000-0000-7000-8000-000000000000"));
+    map.insert(
+        "jti".into(),
+        serde_json::json!("01920000-0000-7000-8000-000000000000"),
+    );
     map.insert("iat".into(), serde_json::json!(now().unix_timestamp()));
-    map.insert("exp".into(), serde_json::json!(now().unix_timestamp() + 900));
+    map.insert(
+        "exp".into(),
+        serde_json::json!(now().unix_timestamp() + 900),
+    );
     for (key, value) in overrides {
         map.insert((*key).to_owned(), value.clone());
     }
@@ -99,8 +117,11 @@ fn claims_with(overrides: &[(&str, serde_json::Value)]) -> String {
 
 /// A verifier holding one key for [`ISSUER`], frozen at [`now`].
 fn verifier_with(key: &TestKey) -> Verifier {
-    let mut verifier = Verifier::with_clock(VerifierOptions::default(), Box::new(FixedClock::new(now())));
-    verifier.set_keys(ISSUER, &key.jwks_json()).expect("JWKS installs");
+    let mut verifier =
+        Verifier::with_clock(VerifierOptions::default(), Box::new(FixedClock::new(now())));
+    verifier
+        .set_keys(ISSUER, &key.jwks_json())
+        .expect("JWKS installs");
     verifier
 }
 
@@ -110,7 +131,9 @@ fn verifies_a_well_formed_user_token() {
     let verifier = verifier_with(&key);
     let token = key.sign(&header(KID), &claims_with(&[]));
 
-    let verified = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect("verifies");
+    let verified = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect("verifies");
 
     assert_eq!(verified.iss, ISSUER);
     assert_eq!(verified.sub, "acc_00000000000000000000000000");
@@ -133,15 +156,29 @@ fn verifies_a_delegated_token_and_reports_its_actor_chain() {
     let token = key.sign(
         &header(KID),
         &claims_with(&[
-            ("act", serde_json::json!({"sub": "agt_00000000000000000000000000"})),
-            ("grant_id", serde_json::json!("grt_00000000000000000000000000")),
+            (
+                "act",
+                serde_json::json!({"sub": "agt_00000000000000000000000000"}),
+            ),
+            (
+                "grant_id",
+                serde_json::json!("grt_00000000000000000000000000"),
+            ),
         ]),
     );
 
-    let verified = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect("verifies");
+    let verified = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect("verifies");
 
-    assert_eq!(verified.sub, "acc_00000000000000000000000000", "sub stays the delegator");
-    assert_eq!(verified.grant_id.as_deref(), Some("grt_00000000000000000000000000"));
+    assert_eq!(
+        verified.sub, "acc_00000000000000000000000000",
+        "sub stays the delegator"
+    );
+    assert_eq!(
+        verified.grant_id.as_deref(),
+        Some("grt_00000000000000000000000000")
+    );
     let act = verified.act.expect("act is present");
     assert_eq!(act.sub, "agt_00000000000000000000000000");
     assert_eq!(act.depth(), 1);
@@ -164,7 +201,9 @@ fn verifies_a_multi_hop_actor_chain() {
         )]),
     );
 
-    let verified = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect("verifies");
+    let verified = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect("verifies");
     let act = verified.act.expect("act is present");
     assert_eq!(act.depth(), 3);
     assert_eq!(act.subs(), vec!["agt_child", "agt_parent", "agt_root"]);
@@ -179,7 +218,9 @@ fn rejects_an_expired_token() {
         &claims_with(&[("exp", serde_json::json!(now().unix_timestamp() - 3_600))]),
     );
 
-    let err = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::Expired, "{err}");
 }
 
@@ -193,7 +234,11 @@ fn accepts_a_token_expired_within_the_clock_skew() {
         &claims_with(&[("exp", serde_json::json!(now().unix_timestamp() - 30))]),
     );
 
-    assert!(verifier.verify_access_token(&token, ISSUER, AUDIENCE).is_ok());
+    assert!(
+        verifier
+            .verify_access_token(&token, ISSUER, AUDIENCE)
+            .is_ok()
+    );
 }
 
 #[test]
@@ -205,7 +250,9 @@ fn rejects_a_token_that_is_not_yet_valid() {
         &claims_with(&[("nbf", serde_json::json!(now().unix_timestamp() + 3_600))]),
     );
 
-    let err = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::NotYetValid, "{err}");
 }
 
@@ -223,7 +270,9 @@ fn rejects_an_implausibly_future_iat() {
         ]),
     );
 
-    let err = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::NotYetValid, "{err}");
 }
 
@@ -233,7 +282,9 @@ fn rejects_a_wrong_audience() {
     let verifier = verifier_with(&key);
     let token = key.sign(&header(KID), &claims_with(&[]));
 
-    let err = verifier.verify_access_token(&token, ISSUER, OTHER_AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, OTHER_AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::AudienceMismatch, "{err}");
 }
 
@@ -246,7 +297,9 @@ fn accepts_an_audience_array_containing_the_expected_value() {
         &claims_with(&[("aud", serde_json::json!([OTHER_AUDIENCE, AUDIENCE]))]),
     );
 
-    let verified = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect("verifies");
+    let verified = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect("verifies");
     assert!(verified.aud.contains(AUDIENCE));
 }
 
@@ -261,7 +314,9 @@ fn rejects_a_wrong_issuer() {
         &claims_with(&[("iss", serde_json::json!(OTHER_ISSUER))]),
     );
 
-    let err = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::IssuerMismatch, "{err}");
 }
 
@@ -272,7 +327,9 @@ fn rejects_an_issuer_with_no_keys_loaded() {
     let verifier = verifier_with(&key);
     let token = key.sign(&header(KID), &claims_with(&[]));
 
-    let err = verifier.verify_access_token(&token, OTHER_ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, OTHER_ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::UnknownKid, "{err}");
 }
 
@@ -285,12 +342,18 @@ fn rejects_a_token_signed_by_another_issuers_key() {
 
     let mut verifier =
         Verifier::with_clock(VerifierOptions::default(), Box::new(FixedClock::new(now())));
-    verifier.set_keys(ISSUER, &demo_key.jwks_json()).expect("installs demo keys");
-    verifier.set_keys(OTHER_ISSUER, &other_key.jwks_json()).expect("installs other keys");
+    verifier
+        .set_keys(ISSUER, &demo_key.jwks_json())
+        .expect("installs demo keys");
+    verifier
+        .set_keys(OTHER_ISSUER, &other_key.jwks_json())
+        .expect("installs other keys");
 
     // Signed by the other tenant's key, but claiming to be the demo tenant's issuer.
     let token = other_key.sign(&header(KID), &claims_with(&[]));
-    let err = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::InvalidSignature, "{err}");
 }
 
@@ -298,9 +361,14 @@ fn rejects_a_token_signed_by_another_issuers_key() {
 fn rejects_an_unknown_kid() {
     let key = TestKey::generate(KID);
     let verifier = verifier_with(&key);
-    let token = key.sign(&header("01920000-0000-7000-8000-0000000000bb"), &claims_with(&[]));
+    let token = key.sign(
+        &header("01920000-0000-7000-8000-0000000000bb"),
+        &claims_with(&[]),
+    );
 
-    let err = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::UnknownKid, "{err}");
 }
 
@@ -310,7 +378,9 @@ fn rejects_a_token_with_no_kid() {
     let verifier = verifier_with(&key);
     let token = key.sign(r#"{"alg":"ES256","typ":"at+jwt"}"#, &claims_with(&[]));
 
-    let err = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::UnknownKid, "{err}");
 }
 
@@ -320,7 +390,9 @@ fn rejects_an_unknown_issuer_with_no_keys() {
     let verifier = verifier_with(&key);
     let token = key.sign(&header(KID), &claims_with(&[]));
 
-    let err = verifier.verify_access_token(&token, OTHER_ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, OTHER_ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::UnknownKid, "{err}");
 }
 
@@ -339,7 +411,9 @@ fn rejects_a_tampered_signature() {
     let tampered = format!("{signing_input}.{}", chars.into_iter().collect::<String>());
 
     assert_ne!(tampered, token, "the tamper must change the token");
-    let err = verifier.verify_access_token(&tampered, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&tampered, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::InvalidSignature, "{err}");
 }
 
@@ -354,7 +428,9 @@ fn a_re_signed_token_with_a_foreign_issuer_is_still_rejected() {
         &claims_with(&[("iss", serde_json::json!(OTHER_ISSUER))]),
     );
 
-    let err = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::IssuerMismatch, "{err}");
 }
 
@@ -367,12 +443,15 @@ fn rejects_a_tampered_payload() {
     // Replace the payload with one that grants more, keeping the original signature.
     let parts: Vec<&str> = token.split('.').collect();
     assert_eq!(parts.len(), 3, "a JWS compact token has three segments");
-    let forged_payload = b64(
-        claims_with(&[("scope", serde_json::json!(["tools:read", "monaca:admin"]))]).as_bytes(),
-    );
+    let forged_payload =
+        b64(
+            claims_with(&[("scope", serde_json::json!(["tools:read", "monaca:admin"]))]).as_bytes(),
+        );
     let forged = format!("{}.{}.{}", parts[0], forged_payload, parts[2]);
 
-    let err = verifier.verify_access_token(&forged, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&forged, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::InvalidSignature, "{err}");
 }
 
@@ -381,7 +460,14 @@ fn rejects_malformed_tokens() {
     let key = TestKey::generate(KID);
     let verifier = verifier_with(&key);
 
-    for token in ["", "not-a-token", "a.b", "a.b.c.d", "!!!.???.###", "eyJhbGciOiJFUzI1NiJ9..x"] {
+    for token in [
+        "",
+        "not-a-token",
+        "a.b",
+        "a.b.c.d",
+        "!!!.???.###",
+        "eyJhbGciOiJFUzI1NiJ9..x",
+    ] {
         let err = verifier
             .verify_access_token(token, ISSUER, AUDIENCE)
             .expect_err("must fail for {token}");
@@ -432,7 +518,10 @@ fn rejects_missing_required_claims() {
             .verify_access_token(&token, ISSUER, AUDIENCE)
             .expect_err(&format!("a token without `{claim}` must be rejected"));
         assert_eq!(err.code, ErrorCode::ClaimsInvalid, "`{claim}` gave {err}");
-        assert!(err.detail.contains(claim), "`{claim}` error must name it: {err}");
+        assert!(
+            err.detail.contains(claim),
+            "`{claim}` error must name it: {err}"
+        );
     }
 }
 
@@ -446,7 +535,9 @@ fn a_token_without_scope_verifies_with_an_empty_scope_set() {
     map.remove("scope");
     let token = key.sign(&header(KID), &serde_json::Value::Object(map).to_string());
 
-    let verified = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect("verifies");
+    let verified = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect("verifies");
     assert!(verified.scope.is_empty());
 }
 
@@ -457,10 +548,15 @@ fn scope_is_sorted_and_deduplicated() {
     let verifier = verifier_with(&key);
     let token = key.sign(
         &header(KID),
-        &claims_with(&[("scope", serde_json::json!(["tools:write", "openid", "tools:read", "openid"]))]),
+        &claims_with(&[(
+            "scope",
+            serde_json::json!(["tools:write", "openid", "tools:read", "openid"]),
+        )]),
     );
 
-    let verified = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect("verifies");
+    let verified = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect("verifies");
     assert_eq!(verified.scope, vec!["openid", "tools:read", "tools:write"]);
 }
 
@@ -474,7 +570,9 @@ fn scope_accepts_the_space_delimited_string_form() {
         &claims_with(&[("scope", serde_json::json!("tools:write tools:read"))]),
     );
 
-    let verified = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect("verifies");
+    let verified = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect("verifies");
     assert_eq!(verified.scope, vec!["tools:read", "tools:write"]);
 }
 
@@ -483,9 +581,14 @@ fn rejects_a_claim_with_the_wrong_type() {
     let key = TestKey::generate(KID);
     let verifier = verifier_with(&key);
     // `exp` as a string: the JSON parses but the claim is not an integer.
-    let token = key.sign(&header(KID), &claims_with(&[("exp", serde_json::json!("soon"))]));
+    let token = key.sign(
+        &header(KID),
+        &claims_with(&[("exp", serde_json::json!("soon"))]),
+    );
 
-    let err = verifier.verify_access_token(&token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert!(
         matches!(err.code, ErrorCode::ClaimsInvalid | ErrorCode::Malformed),
         "unexpected code {err}"
@@ -506,21 +609,35 @@ fn a_refreshed_key_set_replaces_the_old_keys() {
     let mut verifier = verifier_with(&old_key);
     let old_token = old_key.sign(&header(KID), &claims_with(&[]));
 
-    assert!(verifier.verify_access_token(&old_token, ISSUER, AUDIENCE).is_ok());
+    assert!(
+        verifier
+            .verify_access_token(&old_token, ISSUER, AUDIENCE)
+            .is_ok()
+    );
 
-    verifier.set_keys(ISSUER, &new_key.jwks_json()).expect("refreshes");
+    verifier
+        .set_keys(ISSUER, &new_key.jwks_json())
+        .expect("refreshes");
 
     // The retired key must stop verifying immediately.
-    let err = verifier.verify_access_token(&old_token, ISSUER, AUDIENCE).expect_err("must fail");
+    let err = verifier
+        .verify_access_token(&old_token, ISSUER, AUDIENCE)
+        .expect_err("must fail");
     assert_eq!(err.code, ErrorCode::UnknownKid, "{err}");
 }
 
 #[test]
 fn options_default_to_the_contract_skew() {
-    assert_eq!(VerifierOptions::default().clock_skew_secs, DEFAULT_CLOCK_SKEW_SECS);
+    assert_eq!(
+        VerifierOptions::default().clock_skew_secs,
+        DEFAULT_CLOCK_SKEW_SECS
+    );
     assert_eq!(DEFAULT_CLOCK_SKEW_SECS, 60);
     assert_eq!(Verifier::default().clock_skew_secs(), 60);
-    assert_eq!(Verifier::new(VerifierOptions::with_clock_skew_secs(5)).clock_skew_secs(), 5);
+    assert_eq!(
+        Verifier::new(VerifierOptions::with_clock_skew_secs(5)).clock_skew_secs(),
+        5
+    );
 }
 
 #[test]
@@ -535,8 +652,14 @@ fn issuer_count_tracks_set_keys() {
 #[test]
 fn scope_satisfies_is_re_exported_from_here() {
     // The napi layer binds this symbol, so it must be reachable from `monaca_core`.
-    assert!(scope_satisfies(&["tools:read".to_owned()], &["tools:read".to_owned()]));
-    assert!(!scope_satisfies(&["tools:read".to_owned()], &["tools:write".to_owned()]));
+    assert!(scope_satisfies(
+        &["tools:read".to_owned()],
+        &["tools:read".to_owned()]
+    ));
+    assert!(!scope_satisfies(
+        &["tools:read".to_owned()],
+        &["tools:write".to_owned()]
+    ));
 }
 
 #[test]

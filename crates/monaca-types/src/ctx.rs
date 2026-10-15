@@ -25,7 +25,11 @@ impl TenantCtx {
     /// `db_name` is derived from `short` by the caller (which already validated it), because
     /// deriving it here would need the control-plane row this struct deliberately does not hold.
     pub const fn new(tenant_id: TenantId, slug: &'static str, db_name: &'static str) -> Self {
-        Self { tenant_id, slug, db_name }
+        Self {
+            tenant_id,
+            slug,
+            db_name,
+        }
     }
 }
 
@@ -53,7 +57,13 @@ impl OrgCtx {
         schema_name: &'static str,
         role_name: &'static str,
     ) -> Self {
-        Self { tenant, org_id, org_slug, schema_name, role_name }
+        Self {
+            tenant,
+            org_id,
+            org_slug,
+            schema_name,
+            role_name,
+        }
     }
 }
 
@@ -82,13 +92,7 @@ mod tests {
     #[test]
     fn org_ctx_carries_the_names_with_org_tx_needs() {
         let tenant = TenantCtx::new(TenantId::new(), "demo", "mt_demo");
-        let org = OrgCtx::new(
-            tenant,
-            OrgId::new(),
-            "acme",
-            "org_acme",
-            "tdemo_oacme",
-        );
+        let org = OrgCtx::new(tenant, OrgId::new(), "acme", "org_acme", "tdemo_oacme");
         assert_eq!(org.tenant.slug, "demo");
         assert_eq!(org.schema_name, "org_acme");
         assert_eq!(org.role_name, "tdemo_oacme");

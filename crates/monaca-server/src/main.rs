@@ -64,7 +64,9 @@ async fn serve(args: cli::ServeArgs) -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .with_context(|| format!("could not bind {addr}"))?;
-    let bound = listener.local_addr().context("could not read the bound address")?;
+    let bound = listener
+        .local_addr()
+        .context("could not read the bound address")?;
 
     tracing::info!(%bound, "monaca-server listening");
 

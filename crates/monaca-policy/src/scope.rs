@@ -24,7 +24,10 @@ pub struct InvalidScope {
 /// small enough that a regex would be more machinery than the rule it encodes.
 pub fn is_valid_scope(scope: &str) -> Result<(), InvalidScope> {
     let reject = |reason: &'static str| {
-        Err(InvalidScope { scope: scope.to_owned(), reason })
+        Err(InvalidScope {
+            scope: scope.to_owned(),
+            reason,
+        })
     };
 
     if scope.is_empty() {
@@ -82,7 +85,9 @@ pub fn scope_satisfies(granted: &[String], required: &[String]) -> bool {
     // Build the smaller set: for the usual case (a handful of scopes on each side) this is
     // irrelevant, but it keeps the function linear in the smaller input.
     let granted_set: HashSet<&str> = granted.iter().map(String::as_str).collect();
-    required.iter().all(|scope| granted_set.contains(scope.as_str()))
+    required
+        .iter()
+        .all(|scope| granted_set.contains(scope.as_str()))
 }
 
 #[cfg(test)]
@@ -95,7 +100,10 @@ mod tests {
 
     #[test]
     fn subset_is_satisfied() {
-        assert!(scope_satisfies(&scopes(&["tools:read"]), &scopes(&["tools:read"])));
+        assert!(scope_satisfies(
+            &scopes(&["tools:read"]),
+            &scopes(&["tools:read"])
+        ));
         assert!(scope_satisfies(
             &scopes(&["tools:read", "tools:write", "openid"]),
             &scopes(&["tools:read", "openid"])
@@ -104,7 +112,10 @@ mod tests {
 
     #[test]
     fn missing_scope_is_not_satisfied() {
-        assert!(!scope_satisfies(&scopes(&["tools:read"]), &scopes(&["tools:write"])));
+        assert!(!scope_satisfies(
+            &scopes(&["tools:read"]),
+            &scopes(&["tools:write"])
+        ));
         assert!(!scope_satisfies(
             &scopes(&["tools:read"]),
             &scopes(&["tools:read", "tools:write"])
@@ -142,9 +153,18 @@ mod tests {
 
     #[test]
     fn comparison_is_exact_not_prefix_or_case_insensitive() {
-        assert!(!scope_satisfies(&scopes(&["tools:read"]), &scopes(&["tools:"])));
-        assert!(!scope_satisfies(&scopes(&["tools:read"]), &scopes(&["tools:read:"])));
-        assert!(!scope_satisfies(&scopes(&["tools:read"]), &scopes(&["Tools:Read"])));
+        assert!(!scope_satisfies(
+            &scopes(&["tools:read"]),
+            &scopes(&["tools:"])
+        ));
+        assert!(!scope_satisfies(
+            &scopes(&["tools:read"]),
+            &scopes(&["tools:read:"])
+        ));
+        assert!(!scope_satisfies(
+            &scopes(&["tools:read"]),
+            &scopes(&["Tools:Read"])
+        ));
     }
 
     #[test]
@@ -187,7 +207,10 @@ mod tests {
             "read+write",
             "tools:réad",
         ] {
-            assert!(is_valid_scope(scope).is_err(), "`{scope}` should be invalid");
+            assert!(
+                is_valid_scope(scope).is_err(),
+                "`{scope}` should be invalid"
+            );
         }
     }
 

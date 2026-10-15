@@ -114,9 +114,9 @@ impl Verifier {
         };
 
         Ok(Self {
-            inner: monaca_core::Verifier::new(
-                monaca_core::VerifierOptions::with_clock_skew_secs(clock_skew_secs),
-            ),
+            inner: monaca_core::Verifier::new(monaca_core::VerifierOptions::with_clock_skew_secs(
+                clock_skew_secs,
+            )),
         })
     }
 
@@ -130,7 +130,9 @@ impl Verifier {
         issuer: String,
         jwks_json: String,
     ) -> std::result::Result<(), NapiError> {
-        self.inner.set_keys(&issuer, &jwks_json).map_err(token_error)
+        self.inner
+            .set_keys(&issuer, &jwks_json)
+            .map_err(token_error)
     }
 
     /// Verify an access token. Throws an `Error` whose `code` is a `MONACA_TOKEN_*` code.
@@ -191,7 +193,10 @@ fn verified_token(verified: monaca_core::VerifiedToken) -> VerifiedToken {
 
 /// Convert one actor-chain link, preserving arbitrary nesting depth.
 fn actor_chain(chain: monaca_core::ActorChain) -> Rc<ActorChain> {
-    Rc::new(ActorChain { sub: chain.sub, act: chain.act.map(|inner| actor_chain(*inner)) })
+    Rc::new(ActorChain {
+        sub: chain.sub,
+        act: chain.act.map(|inner| actor_chain(*inner)),
+    })
 }
 
 #[cfg(test)]
@@ -209,8 +214,14 @@ mod tests {
     #[test]
     fn scope_satisfies_matches_the_core_relation() {
         let granted = vec!["tools:read".to_owned(), "openid".to_owned()];
-        assert!(scope_satisfies(granted.clone(), vec!["tools:read".to_owned()]));
-        assert!(!scope_satisfies(granted.clone(), vec!["tools:write".to_owned()]));
+        assert!(scope_satisfies(
+            granted.clone(),
+            vec!["tools:read".to_owned()]
+        ));
+        assert!(!scope_satisfies(
+            granted.clone(),
+            vec!["tools:write".to_owned()]
+        ));
         assert!(scope_satisfies(granted, vec![]));
     }
 
@@ -220,7 +231,10 @@ mod tests {
             sub: "agt_child".into(),
             act: Some(Box::new(monaca_core::ActorChain {
                 sub: "agt_parent".into(),
-                act: Some(Box::new(monaca_core::ActorChain { sub: "agt_root".into(), act: None })),
+                act: Some(Box::new(monaca_core::ActorChain {
+                    sub: "agt_root".into(),
+                    act: None,
+                })),
             })),
         };
 
@@ -235,10 +249,8 @@ mod tests {
 
     #[test]
     fn a_token_error_carries_the_contract_code() {
-        let core = monaca_core::TokenError::new(
-            monaca_core::ErrorCode::Expired,
-            "token has expired",
-        );
+        let core =
+            monaca_core::TokenError::new(monaca_core::ErrorCode::Expired, "token has expired");
         let error = token_error(core);
         // `status` is what napi writes into the JS error's `code` property.
         assert_eq!(error.status, "MONACA_TOKEN_EXPIRED");
@@ -254,7 +266,10 @@ mod tests {
             tid: "ten_00000000000000000000000000".into(),
             org: "org_00000000000000000000000000".into(),
             scope: vec!["tools:read".into()],
-            act: Some(monaca_core::ActorChain { sub: "agt_1".into(), act: None }),
+            act: Some(monaca_core::ActorChain {
+                sub: "agt_1".into(),
+                act: None,
+            }),
             grant_id: Some("grt_1".into()),
             jti: "01920000-0000-7000-8000-000000000000".into(),
             iat: 1_767_225_600,
@@ -278,15 +293,19 @@ mod tests {
 
     #[test]
     fn the_constructor_rejects_a_negative_skew() {
-        let result = Verifier::new(Some(VerifierOptions { clock_skew_secs: Some(-1) }));
+        let result = Verifier::new(Some(VerifierOptions {
+            clock_skew_secs: Some(-1),
+        }));
         let error = result.err().expect("a negative skew must be refused");
         assert_eq!(error.status, "MONACA_JWKS_INVALID");
     }
 
     #[test]
     fn the_constructor_accepts_a_skew() {
-        let verifier = Verifier::new(Some(VerifierOptions { clock_skew_secs: Some(5) }))
-            .expect("constructs");
+        let verifier = Verifier::new(Some(VerifierOptions {
+            clock_skew_secs: Some(5),
+        }))
+        .expect("constructs");
         assert_eq!(verifier.inner.clock_skew_secs(), 5);
     }
 

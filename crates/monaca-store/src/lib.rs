@@ -108,7 +108,11 @@ mod tests {
 
     #[test]
     fn errors_render_a_useful_message() {
-        assert!(StoreError::UnknownTenant("demo".into()).to_string().contains("demo"));
+        assert!(
+            StoreError::UnknownTenant("demo".into())
+                .to_string()
+                .contains("demo")
+        );
         let mismatch = StoreError::MigrationChecksum {
             version: 3,
             recorded: "aaa".into(),

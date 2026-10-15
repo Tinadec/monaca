@@ -6,7 +6,7 @@
 //! rather than as fields of [`AuditEvent`] — a field that is not there cannot be hashed by
 //! accident.
 
-use monaca_types::{AccountId, AgentId, EventId, GrantId, OrgId, TenantId};
+use monaca_types::{AccountId, AgentId, EventId, GrantId, OrgId, TenantId, TypedId};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -50,27 +50,42 @@ pub struct AuditActor {
 impl AuditActor {
     /// An account actor.
     pub fn account(id: AccountId) -> Self {
-        Self { actor_type: AuditActorType::Account, id: id.to_typed_string() }
+        Self {
+            actor_type: AuditActorType::Account,
+            id: id.to_typed_string(),
+        }
     }
 
     /// An agent actor.
     pub fn agent(id: AgentId) -> Self {
-        Self { actor_type: AuditActorType::Agent, id: id.to_typed_string() }
+        Self {
+            actor_type: AuditActorType::Agent,
+            id: id.to_typed_string(),
+        }
     }
 
     /// A tenant actor.
     pub fn tenant(id: TenantId) -> Self {
-        Self { actor_type: AuditActorType::Tenant, id: id.to_typed_string() }
+        Self {
+            actor_type: AuditActorType::Tenant,
+            id: id.to_typed_string(),
+        }
     }
 
     /// An organization actor.
     pub fn org(id: OrgId) -> Self {
-        Self { actor_type: AuditActorType::Org, id: id.to_typed_string() }
+        Self {
+            actor_type: AuditActorType::Org,
+            id: id.to_typed_string(),
+        }
     }
 
     /// A tool actor; `name` is the bare tool name, not a typed id.
     pub fn tool(name: impl Into<String>) -> Self {
-        Self { actor_type: AuditActorType::Tool, id: name.into() }
+        Self {
+            actor_type: AuditActorType::Tool,
+            id: name.into(),
+        }
     }
 }
 
@@ -153,7 +168,9 @@ impl AuditEvent {
             return Err(EventInvalid::EmptyAction);
         }
         if !is_dotted_lowercase_verb(&self.action) {
-            return Err(EventInvalid::ActionNotADottedLowercaseVerb(self.action.clone()));
+            return Err(EventInvalid::ActionNotADottedLowercaseVerb(
+                self.action.clone(),
+            ));
         }
         match &self.payload {
             serde_json::Value::Object(_) => {}
@@ -195,7 +212,9 @@ fn is_dotted_lowercase_verb(action: &str) -> bool {
     }
     action.split('.').all(|part| {
         !part.is_empty()
-            && part.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
+            && part
+                .chars()
+                .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
     })
 }
 
@@ -221,7 +240,10 @@ mod tests {
             id: EventId::new(),
             at: OffsetDateTime::from_unix_timestamp(1_767_225_600).expect("timestamp"),
             action: "agent.token.issued".into(),
-            actor_chain: vec![AuditActor::account(AccountId::new()), AuditActor::agent(AgentId::new())],
+            actor_chain: vec![
+                AuditActor::account(AccountId::new()),
+                AuditActor::agent(AgentId::new()),
+            ],
             subject: AuditSubject {
                 subject_type: AuditActorType::Grant,
                 id: Some(GrantId::new().to_typed_string()),
@@ -260,15 +282,29 @@ mod tests {
 
     #[test]
     fn an_action_that_is_not_a_dotted_lowercase_verb_is_invalid() {
-        for action in ["Agent.Token.Issued", "agent token issued", ".agent", "agent.", "agent..x", "agent/issued"] {
+        for action in [
+            "Agent.Token.Issued",
+            "agent token issued",
+            ".agent",
+            "agent.",
+            "agent..x",
+            "agent/issued",
+        ] {
             let mut event = valid_event();
             event.action = action.into();
             assert!(
-                matches!(event.validate(), Err(EventInvalid::ActionNotADottedLowercaseVerb(_))),
+                matches!(
+                    event.validate(),
+                    Err(EventInvalid::ActionNotADottedLowercaseVerb(_))
+                ),
                 "`{action}` should be invalid"
             );
         }
-        for action in ["tool.invoked", "interaction.sign_in.failed", "agent.token.issued"] {
+        for action in [
+            "tool.invoked",
+            "interaction.sign_in.failed",
+            "agent.token.issued",
+        ] {
             let mut event = valid_event();
             event.action = action.into();
             assert!(event.validate().is_ok(), "`{action}` should be valid");

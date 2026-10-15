@@ -16,6 +16,7 @@ on:
       - "packages/**"
       - "modules/**"
       - "apps/gateway/**"
+      - "scripts/**"
       - "package.json"
       - "bun.lock"
       - "deploy/**"

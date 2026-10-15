@@ -121,8 +121,14 @@ mod tests {
         assert_eq!(TokenErrorCode::InvalidRequest.as_str(), "invalid_request");
         assert_eq!(TokenErrorCode::InvalidClient.as_str(), "invalid_client");
         assert_eq!(TokenErrorCode::InvalidGrant.as_str(), "invalid_grant");
-        assert_eq!(TokenErrorCode::UnauthorizedClient.as_str(), "unauthorized_client");
-        assert_eq!(TokenErrorCode::UnsupportedGrantType.as_str(), "unsupported_grant_type");
+        assert_eq!(
+            TokenErrorCode::UnauthorizedClient.as_str(),
+            "unauthorized_client"
+        );
+        assert_eq!(
+            TokenErrorCode::UnsupportedGrantType.as_str(),
+            "unsupported_grant_type"
+        );
         assert_eq!(TokenErrorCode::InvalidScope.as_str(), "invalid_scope");
     }
 
@@ -143,8 +149,11 @@ mod tests {
 
     #[test]
     fn grant_types_round_trip() {
-        for grant in [GrantType::AuthorizationCode, GrantType::RefreshToken, GrantType::ClientCredentials]
-        {
+        for grant in [
+            GrantType::AuthorizationCode,
+            GrantType::RefreshToken,
+            GrantType::ClientCredentials,
+        ] {
             assert_eq!(GrantType::parse(grant.as_str()), Some(grant));
         }
         assert_eq!(GrantType::parse("password"), None);

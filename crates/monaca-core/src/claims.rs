@@ -165,12 +165,17 @@ impl Scope {
     /// The scopes, sorted and de-duplicated.
     pub fn normalized(&self) -> Vec<String> {
         let mut scopes: Vec<String> = match self {
-            Scope::String(value) => {
-                value.split(' ').filter(|part| !part.is_empty()).map(str::to_owned).collect()
-            }
-            Scope::Array(values) => {
-                values.iter().flat_map(|value| value.split(' ')).filter(|part| !part.is_empty()).map(str::to_owned).collect()
-            }
+            Scope::String(value) => value
+                .split(' ')
+                .filter(|part| !part.is_empty())
+                .map(str::to_owned)
+                .collect(),
+            Scope::Array(values) => values
+                .iter()
+                .flat_map(|value| value.split(' '))
+                .filter(|part| !part.is_empty())
+                .map(str::to_owned)
+                .collect(),
         };
         scopes.sort_unstable();
         scopes.dedup();
@@ -184,12 +189,18 @@ mod tests {
 
     #[test]
     fn actor_chain_depth_counts_hops() {
-        let single = ActorChain { sub: "agt_a".into(), act: None };
+        let single = ActorChain {
+            sub: "agt_a".into(),
+            act: None,
+        };
         assert_eq!(single.depth(), 1);
 
         let two = ActorChain {
             sub: "agt_b".into(),
-            act: Some(Box::new(ActorChain { sub: "agt_a".into(), act: None })),
+            act: Some(Box::new(ActorChain {
+                sub: "agt_a".into(),
+                act: None,
+            })),
         };
         assert_eq!(two.depth(), 2);
 
@@ -206,7 +217,10 @@ mod tests {
             sub: "agt_c".into(),
             act: Some(Box::new(ActorChain {
                 sub: "agt_b".into(),
-                act: Some(Box::new(ActorChain { sub: "agt_a".into(), act: None })),
+                act: Some(Box::new(ActorChain {
+                    sub: "agt_a".into(),
+                    act: None,
+                })),
             })),
         };
         assert_eq!(chain.subs(), vec!["agt_c", "agt_b", "agt_a"]);
@@ -224,13 +238,16 @@ mod tests {
         assert!(multiple.contains("https://a.test"));
         assert!(multiple.contains("https://b.test"));
         assert!(!multiple.contains("https://c.test"));
-        assert_eq!(multiple.to_reported_string(), "https://a.test https://b.test");
+        assert_eq!(
+            multiple.to_reported_string(),
+            "https://a.test https://b.test"
+        );
     }
 
     #[test]
     fn scope_is_normalized_from_both_spellings() {
-        let from_string: Scope = serde_json::from_str("\"tools:write tools:read tools:read\"")
-            .expect("string");
+        let from_string: Scope =
+            serde_json::from_str("\"tools:write tools:read tools:read\"").expect("string");
         assert_eq!(from_string.normalized(), vec!["tools:read", "tools:write"]);
 
         let from_array: Scope =
@@ -262,8 +279,7 @@ mod tests {
     fn a_wrongly_typed_claim_fails_to_deserialize() {
         // `exp` as a string is not an integer; the verifier turns this into
         // MONACA_TOKEN_CLAIMS_INVALID rather than a panic.
-        let result: Result<AccessTokenClaims, _> =
-            serde_json::from_str(r#"{"exp":"later"}"#);
+        let result: Result<AccessTokenClaims, _> = serde_json::from_str(r#"{"exp":"later"}"#);
         assert!(result.is_err(), "a string exp must not deserialize as i64");
     }
 }

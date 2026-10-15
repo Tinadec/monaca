@@ -84,8 +84,7 @@ fn write_event_schemas(out: &Path) -> anyhow::Result<()> {
         std::fs::remove_dir_all(out)
             .with_context(|| format!("could not clear {}", out.display()))?;
     }
-    std::fs::create_dir_all(out)
-        .with_context(|| format!("could not create {}", out.display()))?;
+    std::fs::create_dir_all(out).with_context(|| format!("could not create {}", out.display()))?;
 
     for action in M0_ACTIONS {
         let schema = event_schema(action);
@@ -194,7 +193,10 @@ mod tests {
             "interaction.sign_in.succeeded",
             "interaction.sign_in.failed",
         ] {
-            assert!(M0_ACTIONS.contains(&action), "{action} must be in the M0 set");
+            assert!(
+                M0_ACTIONS.contains(&action),
+                "{action} must be in the M0 set"
+            );
         }
     }
 
@@ -211,7 +213,10 @@ mod tests {
         let schema = event_schema("tool.invoked");
         let properties = schema["properties"].as_object().expect("properties");
         for field in ["seq", "prev_hash", "hash"] {
-            assert!(!properties.contains_key(field), "`{field}` must not be a schema member");
+            assert!(
+                !properties.contains_key(field),
+                "`{field}` must not be a schema member"
+            );
         }
     }
 
@@ -224,7 +229,15 @@ mod tests {
             .iter()
             .map(|value| value.as_str().expect("string"))
             .collect();
-        for field in ["id", "at", "action", "actor_chain", "subject", "decision", "payload"] {
+        for field in [
+            "id",
+            "at",
+            "action",
+            "actor_chain",
+            "subject",
+            "decision",
+            "payload",
+        ] {
             assert!(required.contains(&field), "`{field}` must be required");
         }
         // Optional members must not be required.
@@ -267,8 +280,21 @@ mod tests {
             .map(|value| value.as_str().expect("string"))
             .collect();
         assert_eq!(types.len(), 9);
-        for expected in ["account", "org", "agent", "agent_key", "grant", "client", "tool", "session", "tenant"] {
-            assert!(types.contains(&expected), "{expected} must be a subject type");
+        for expected in [
+            "account",
+            "org",
+            "agent",
+            "agent_key",
+            "grant",
+            "client",
+            "tool",
+            "session",
+            "tenant",
+        ] {
+            assert!(
+                types.contains(&expected),
+                "{expected} must be a subject type"
+            );
         }
     }
 
@@ -295,7 +321,10 @@ mod tests {
 
         write_event_schemas(&dir).expect("writes schemas");
 
-        assert!(!dir.join("stale.json").exists(), "a stale schema must not survive");
+        assert!(
+            !dir.join("stale.json").exists(),
+            "a stale schema must not survive"
+        );
         assert!(dir.join("tool.invoked.json").exists());
         assert!(dir.join("interaction.sign_in.failed.json").exists());
 

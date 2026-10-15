@@ -20,31 +20,56 @@ async fn json_body(response: axum::response::Response) -> serde_json::Value {
 #[tokio::test]
 async fn healthz_answers_ok() {
     let response = crate::routes::router()
-        .oneshot(Request::builder().uri("/healthz").body(Body::empty()).expect("request"))
+        .oneshot(
+            Request::builder()
+                .uri("/healthz")
+                .body(Body::empty())
+                .expect("request"),
+        )
         .await
         .expect("the router responds");
 
     assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(json_body(response).await, serde_json::json!({"status": "ok"}));
+    assert_eq!(
+        json_body(response).await,
+        serde_json::json!({"status": "ok"})
+    );
 }
 
 /// The gateway's `/healthz` adds a `service` member; the server's does not — §6.1 vs §9.
 #[tokio::test]
 async fn healthz_does_not_name_a_service() {
     let response = crate::routes::router()
-        .oneshot(Request::builder().uri("/healthz").body(Body::empty()).expect("request"))
+        .oneshot(
+            Request::builder()
+                .uri("/healthz")
+                .body(Body::empty())
+                .expect("request"),
+        )
         .await
         .expect("the router responds");
 
     let body = json_body(response).await;
-    assert!(body.get("service").is_none(), "the server's healthz has no `service` member");
-    assert_eq!(body.as_object().expect("an object").len(), 1, "only `status` is present");
+    assert!(
+        body.get("service").is_none(),
+        "the server's healthz has no `service` member"
+    );
+    assert_eq!(
+        body.as_object().expect("an object").len(),
+        1,
+        "only `status` is present"
+    );
 }
 
 #[tokio::test]
 async fn version_reports_the_binary() {
     let response = crate::routes::router()
-        .oneshot(Request::builder().uri("/version").body(Body::empty()).expect("request"))
+        .oneshot(
+            Request::builder()
+                .uri("/version")
+                .body(Body::empty())
+                .expect("request"),
+        )
         .await
         .expect("the router responds");
 
@@ -58,7 +83,12 @@ async fn version_reports_the_binary() {
 #[tokio::test]
 async fn an_unknown_path_is_not_found() {
     let response = crate::routes::router()
-        .oneshot(Request::builder().uri("/nope").body(Body::empty()).expect("request"))
+        .oneshot(
+            Request::builder()
+                .uri("/nope")
+                .body(Body::empty())
+                .expect("request"),
+        )
         .await
         .expect("the router responds");
 
@@ -70,7 +100,12 @@ async fn an_unknown_path_is_not_found() {
 #[tokio::test]
 async fn internal_routes_are_not_mounted_in_stage_0() {
     let response = crate::routes::router()
-        .oneshot(Request::builder().uri("/internal/health").body(Body::empty()).expect("request"))
+        .oneshot(
+            Request::builder()
+                .uri("/internal/health")
+                .body(Body::empty())
+                .expect("request"),
+        )
         .await
         .expect("the router responds");
 
@@ -85,10 +120,22 @@ fn the_openapi_document_covers_the_stage_0_routes() {
     let value: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
 
     let paths = value["paths"].as_object().expect("paths is an object");
-    assert!(paths.contains_key("/healthz"), "the document must describe /healthz");
-    assert!(paths.contains_key("/version"), "the document must describe /version");
-    assert!(paths["/healthz"].get("get").is_some(), "/healthz must be a GET");
-    assert!(paths["/version"].get("get").is_some(), "/version must be a GET");
+    assert!(
+        paths.contains_key("/healthz"),
+        "the document must describe /healthz"
+    );
+    assert!(
+        paths.contains_key("/version"),
+        "the document must describe /version"
+    );
+    assert!(
+        paths["/healthz"].get("get").is_some(),
+        "/healthz must be a GET"
+    );
+    assert!(
+        paths["/version"].get("get").is_some(),
+        "/version must be a GET"
+    );
 }
 
 /// The generated document is valid OpenAPI 3.x and names the service.

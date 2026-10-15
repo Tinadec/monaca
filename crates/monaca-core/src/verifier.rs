@@ -10,10 +10,10 @@
 use jsonwebtoken::{Algorithm, Validation};
 use monaca_types::{Clock, SystemClock};
 
+use crate::DEFAULT_CLOCK_SKEW_SECS;
 use crate::claims::{AccessTokenClaims, VerifiedToken};
 use crate::error::{ErrorCode, TokenError};
 use crate::jwks::{IssuerKeys, KeySet};
-use crate::DEFAULT_CLOCK_SKEW_SECS;
 
 /// Construction options — §4.2 `VerifierOptions`.
 #[derive(Debug, Clone)]
@@ -24,7 +24,9 @@ pub struct VerifierOptions {
 
 impl Default for VerifierOptions {
     fn default() -> Self {
-        Self { clock_skew_secs: DEFAULT_CLOCK_SKEW_SECS }
+        Self {
+            clock_skew_secs: DEFAULT_CLOCK_SKEW_SECS,
+        }
     }
 }
 
@@ -36,7 +38,9 @@ impl VerifierOptions {
 
     /// Options with an explicit skew.
     pub fn with_clock_skew_secs(secs: u64) -> Self {
-        Self { clock_skew_secs: secs }
+        Self {
+            clock_skew_secs: secs,
+        }
     }
 }
 
@@ -77,7 +81,11 @@ impl Verifier {
 
     /// A verifier reading time from `clock`. Tests use this; production does not.
     pub fn with_clock(options: VerifierOptions, clock: Box<dyn Clock>) -> Self {
-        Self { keys: KeySet::new(), clock, options }
+        Self {
+            keys: KeySet::new(),
+            clock,
+            options,
+        }
     }
 
     /// Replace the key set for `issuer` — §4.2 `setKeys`.
@@ -128,9 +136,11 @@ impl Verifier {
             ));
         }
 
-        let kid = header.kid.as_deref().filter(|kid| !kid.is_empty()).ok_or_else(|| {
-            TokenError::new(ErrorCode::UnknownKid, "token header has no `kid`")
-        })?;
+        let kid = header
+            .kid
+            .as_deref()
+            .filter(|kid| !kid.is_empty())
+            .ok_or_else(|| TokenError::new(ErrorCode::UnknownKid, "token header has no `kid`"))?;
 
         let keys = self.keys.issuer(expected_issuer).ok_or_else(|| {
             TokenError::new(
@@ -151,16 +161,14 @@ impl Verifier {
         //    because §6.2 wants an exact comparison against one audience, and because the
         //    audience check must be able to report its own code.
         let validation = self.validation_for(expected_issuer);
-        let token_data = jsonwebtoken::decode::<AccessTokenClaims>(token, decoding_key, &validation)
-            .map_err(|err| self.classify_decode_error(&err, expected_issuer))?;
+        let token_data =
+            jsonwebtoken::decode::<AccessTokenClaims>(token, decoding_key, &validation)
+                .map_err(|err| self.classify_decode_error(&err, expected_issuer))?;
 
         let claims = token_data.claims;
 
         // 3. Signature is good; now the claims can be trusted enough to check the rest.
-        let audience = claims
-            .aud
-            .as_ref()
-            .ok_or_else(|| missing_claim("aud"))?;
+        let audience = claims.aud.as_ref().ok_or_else(|| missing_claim("aud"))?;
         if !audience.contains(expected_audience) {
             return Err(TokenError::new(
                 ErrorCode::AudienceMismatch,
@@ -187,7 +195,11 @@ impl Verifier {
         let jti = claims.jti.ok_or_else(|| missing_claim("jti"))?;
         let iat = claims.iat.ok_or_else(|| missing_claim("iat"))?;
         let exp = claims.exp.ok_or_else(|| missing_claim("exp"))?;
-        let scope = claims.scope.as_ref().map(|scope| scope.normalized()).unwrap_or_default();
+        let scope = claims
+            .scope
+            .as_ref()
+            .map(|scope| scope.normalized())
+            .unwrap_or_default();
 
         // §4.3: `iat` implausibly ahead of now is MONACA_TOKEN_NOT_YET_VALID. jsonwebtoken
         // validates `nbf` but has no `iat` check, and a future `iat` is how a stolen token gets
@@ -253,12 +265,13 @@ impl Verifier {
         use jsonwebtoken::errors::ErrorKind as Kind;
 
         match err.kind() {
-            Kind::ExpiredSignature => {
-                TokenError::new(ErrorCode::Expired, "token has expired")
-            }
+            Kind::ExpiredSignature => TokenError::new(ErrorCode::Expired, "token has expired"),
             Kind::ImmatureSignature => TokenError::new(
                 ErrorCode::NotYetValid,
-                format!("token `nbf` is in the future (skew {}s)", self.options.clock_skew_secs),
+                format!(
+                    "token `nbf` is in the future (skew {}s)",
+                    self.options.clock_skew_secs
+                ),
             ),
             Kind::InvalidIssuer => TokenError::new(
                 ErrorCode::IssuerMismatch,
@@ -305,11 +318,17 @@ impl Verifier {
 }
 
 fn missing_claim(claim: &str) -> TokenError {
-    TokenError::new(ErrorCode::ClaimsInvalid, format!("required claim `{claim}` is missing"))
+    TokenError::new(
+        ErrorCode::ClaimsInvalid,
+        format!("required claim `{claim}` is missing"),
+    )
 }
 
 /// A decode failure in the header or the JWS envelope is `MONACA_TOKEN_MALFORMED` — §4.3's
 /// "not a JWS, bad JSON, bad base64url, wrong segment count".
 fn malformed_from_jsonwebtoken(err: &jsonwebtoken::errors::Error, what: &str) -> TokenError {
-    TokenError::new(ErrorCode::Malformed, format!("{what} could not be decoded: {err}"))
+    TokenError::new(
+        ErrorCode::Malformed,
+        format!("{what} could not be decoded: {err}"),
+    )
 }

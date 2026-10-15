@@ -49,7 +49,9 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
 /// serve, exactly as the gateway's own `/healthz` does, so the two are interchangeable to a
 /// probe. A dependency check belongs on `/internal/health`, which is where §6.3 puts it.
 pub fn health_routes() -> Router {
-    Router::new().route("/healthz", get(healthz)).route("/version", get(version))
+    Router::new()
+        .route("/healthz", get(healthz))
+        .route("/version", get(version))
 }
 
 /// The protocol endpoints — §6.1. Populated in M0 feature step 4.

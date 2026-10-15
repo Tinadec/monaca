@@ -6,8 +6,8 @@
 
 use std::collections::HashMap;
 
-use jsonwebtoken::jwk::{AlgorithmParameters, EllipticCurve, Jwk, JwkSet};
 use jsonwebtoken::DecodingKey;
+use jsonwebtoken::jwk::{AlgorithmParameters, EllipticCurve, Jwk, JwkSet};
 
 use crate::error::{ErrorCode, TokenError};
 
@@ -204,9 +204,8 @@ mod tests {
 
     #[test]
     fn a_key_without_a_kid_is_unreachable_and_skipped() {
-        let json = format!(
-            r#"{{"keys":[{{"kty":"EC","crv":"P-256","x":"{P256_X}","y":"{P256_Y}"}}]}}"#
-        );
+        let json =
+            format!(r#"{{"keys":[{{"kty":"EC","crv":"P-256","x":"{P256_X}","y":"{P256_Y}"}}]}}"#);
         let err = parse_jwks(&json).expect_err("must fail: no reachable key");
         assert_eq!(err.code, ErrorCode::JwksInvalid);
     }
@@ -214,11 +213,18 @@ mod tests {
     #[test]
     fn inserting_replaces_rather_than_merges() {
         let mut set = KeySet::new();
-        set.insert_jwks("https://issuer.test/t/demo", &jwks_json("k1")).expect("inserts");
-        assert_eq!(set.issuer("https://issuer.test/t/demo").expect("present").len(), 1);
+        set.insert_jwks("https://issuer.test/t/demo", &jwks_json("k1"))
+            .expect("inserts");
+        assert_eq!(
+            set.issuer("https://issuer.test/t/demo")
+                .expect("present")
+                .len(),
+            1
+        );
 
         // A refresh that drops `k1` must drop it here too: a retired key must stop verifying.
-        set.insert_jwks("https://issuer.test/t/demo", &jwks_json("k2")).expect("inserts");
+        set.insert_jwks("https://issuer.test/t/demo", &jwks_json("k2"))
+            .expect("inserts");
         let keys = set.issuer("https://issuer.test/t/demo").expect("present");
         assert_eq!(keys.kids(), vec!["k2"]);
         assert!(keys.get("k1").is_none());
@@ -227,11 +233,23 @@ mod tests {
     #[test]
     fn issuers_are_independent() {
         let mut set = KeySet::new();
-        set.insert_jwks("https://a.test/t/x", &jwks_json("k1")).expect("inserts");
-        set.insert_jwks("https://b.test/t/y", &jwks_json("k2")).expect("inserts");
+        set.insert_jwks("https://a.test/t/x", &jwks_json("k1"))
+            .expect("inserts");
+        set.insert_jwks("https://b.test/t/y", &jwks_json("k2"))
+            .expect("inserts");
         assert_eq!(set.len(), 2);
-        assert!(set.issuer("https://a.test/t/x").expect("a").get("k1").is_some());
-        assert!(set.issuer("https://b.test/t/y").expect("b").get("k1").is_none());
+        assert!(
+            set.issuer("https://a.test/t/x")
+                .expect("a")
+                .get("k1")
+                .is_some()
+        );
+        assert!(
+            set.issuer("https://b.test/t/y")
+                .expect("b")
+                .get("k1")
+                .is_none()
+        );
         assert!(set.issuer("https://c.test/t/z").is_none());
     }
 
@@ -246,11 +264,19 @@ mod tests {
     #[test]
     fn a_failed_insert_leaves_the_previous_keys_untouched() {
         let mut set = KeySet::new();
-        set.insert_jwks("https://issuer.test/t/demo", &jwks_json("k1")).expect("inserts");
-        let err = set.insert_jwks("https://issuer.test/t/demo", "{bad").expect_err("must fail");
+        set.insert_jwks("https://issuer.test/t/demo", &jwks_json("k1"))
+            .expect("inserts");
+        let err = set
+            .insert_jwks("https://issuer.test/t/demo", "{bad")
+            .expect_err("must fail");
         assert_eq!(err.code, ErrorCode::JwksInvalid);
         // The good keys survive a bad refresh, so a transient fetch error does not blind the
         // verifier.
-        assert_eq!(set.issuer("https://issuer.test/t/demo").expect("present").kids(), vec!["k1"]);
+        assert_eq!(
+            set.issuer("https://issuer.test/t/demo")
+                .expect("present")
+                .kids(),
+            vec!["k1"]
+        );
     }
 }

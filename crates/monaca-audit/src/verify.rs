@@ -201,7 +201,9 @@ pub fn verify_chain(rows: &[StoredEvent], head: ChainHead, from: i64) -> VerifyR
     // to equal the stored head. An empty range at `from == head.seq + 1` is vacuously complete.
     let recomputed_head = previous.unwrap_or(crate::chain::GENESIS_HASH);
     let expected_count = head.seq - from + 1;
-    let counted_ok = i64::try_from(checked).map(|checked| checked == expected_count).unwrap_or(false);
+    let counted_ok = i64::try_from(checked)
+        .map(|checked| checked == expected_count)
+        .unwrap_or(false);
 
     if !counted_ok {
         return VerifyReport {
@@ -231,7 +233,12 @@ pub fn verify_chain(rows: &[StoredEvent], head: ChainHead, from: i64) -> VerifyR
         };
     }
 
-    VerifyReport { valid: true, checked, head, first_broken: None }
+    VerifyReport {
+        valid: true,
+        checked,
+        head,
+        first_broken: None,
+    }
 }
 
 #[cfg(test)]
@@ -253,7 +260,10 @@ mod tests {
                     .expect("timestamp"),
                 action: "tool.invoked".into(),
                 actor_chain: vec![AuditActor::account(AccountId::new())],
-                subject: AuditSubject { subject_type: AuditActorType::Tool, id: None },
+                subject: AuditSubject {
+                    subject_type: AuditActorType::Tool,
+                    id: None,
+                },
                 decision: AuditDecision::Allow,
                 grant_id: None,
                 jti: None,
@@ -262,11 +272,18 @@ mod tests {
             let hash = chain_hash(&previous, &event).expect("hashes");
             rows.push(StoredEvent::new(
                 event,
-                ChainFields { seq: index as i64 + 1, prev_hash: previous, hash },
+                ChainFields {
+                    seq: index as i64 + 1,
+                    prev_hash: previous,
+                    hash,
+                },
             ));
             previous = hash;
         }
-        let head = ChainHead { seq: count as i64, hash: previous };
+        let head = ChainHead {
+            seq: count as i64,
+            hash: previous,
+        };
         (rows, head)
     }
 
@@ -304,7 +321,10 @@ mod tests {
 
         let report = verify_chain(&rows, head, 1);
         assert!(!report.valid);
-        assert_eq!(report.first_broken.expect("broken").reason, VerifyReason::HashMismatch);
+        assert_eq!(
+            report.first_broken.expect("broken").reason,
+            VerifyReason::HashMismatch
+        );
         assert_eq!(report.checked, 1);
     }
 
@@ -322,7 +342,10 @@ mod tests {
         let report = verify_chain(&rows, head, 1);
         assert!(!report.valid);
         let stop = report.first_broken.expect("broken");
-        assert_eq!(stop.seq, 1, "the first row already carries the wrong predecessor");
+        assert_eq!(
+            stop.seq, 1,
+            "the first row already carries the wrong predecessor"
+        );
         assert_eq!(stop.reason, VerifyReason::PrevHashMismatch);
         assert_eq!(report.checked, 0);
     }
@@ -335,7 +358,10 @@ mod tests {
 
         let report = verify_chain(&rows, head, 1);
         assert!(!report.valid);
-        assert_eq!(report.first_broken.expect("broken").reason, VerifyReason::SeqGap);
+        assert_eq!(
+            report.first_broken.expect("broken").reason,
+            VerifyReason::SeqGap
+        );
     }
 
     /// A deleted row makes the sequence non-contiguous.
@@ -361,7 +387,10 @@ mod tests {
 
         let report = verify_chain(&rows, head, 1);
         assert!(!report.valid);
-        assert_eq!(report.first_broken.expect("broken").reason, VerifyReason::HeadMismatch);
+        assert_eq!(
+            report.first_broken.expect("broken").reason,
+            VerifyReason::HeadMismatch
+        );
     }
 
     /// A rewritten head is the other half of truncation detection.
@@ -375,14 +404,20 @@ mod tests {
         let stop = report.first_broken.expect("broken");
         assert_eq!(stop.reason, VerifyReason::HeadMismatch);
         assert_eq!(stop.seq, 3);
-        assert_eq!(report.checked, 3, "every row verified; only the head disagrees");
+        assert_eq!(
+            report.checked, 3,
+            "every row verified; only the head disagrees"
+        );
     }
 
     /// An empty chain at genesis head (seq 0, zero hash) is valid: `checked == 0` and
     /// `0 == 0 - 1 + 1`.
     #[test]
     fn an_empty_chain_against_a_genesis_head_is_valid() {
-        let head = ChainHead { seq: 0, hash: GENESIS_HASH };
+        let head = ChainHead {
+            seq: 0,
+            hash: GENESIS_HASH,
+        };
         let report = verify_chain(&[], head, 1);
         assert!(report.valid, "{report:?}");
         assert_eq!(report.checked, 0);
@@ -394,7 +429,10 @@ mod tests {
         let (_rows, head) = build(2);
         let report = verify_chain(&[], head, 1);
         assert!(!report.valid);
-        assert_eq!(report.first_broken.expect("broken").reason, VerifyReason::HeadMismatch);
+        assert_eq!(
+            report.first_broken.expect("broken").reason,
+            VerifyReason::HeadMismatch
+        );
     }
 
     /// Verifying a sub-range works when its `prev_hash` is checked against the row before it.
@@ -405,7 +443,10 @@ mod tests {
         // `previous.unwrap_or(GENESIS)`, so a suffix against genesis reports a mismatch.
         let suffix = rows[2..].to_vec();
         let report = verify_chain(&suffix, head, 3);
-        assert!(!report.valid, "a suffix without its predecessor cannot be chained");
+        assert!(
+            !report.valid,
+            "a suffix without its predecessor cannot be chained"
+        );
         assert_eq!(
             report.first_broken.expect("broken").reason,
             VerifyReason::PrevHashMismatch
@@ -437,7 +478,10 @@ mod tests {
     #[test]
     fn reason_strings_match_the_contract() {
         assert_eq!(VerifyReason::HashMismatch.as_str(), "hash_mismatch");
-        assert_eq!(VerifyReason::PrevHashMismatch.as_str(), "prev_hash_mismatch");
+        assert_eq!(
+            VerifyReason::PrevHashMismatch.as_str(),
+            "prev_hash_mismatch"
+        );
         assert_eq!(VerifyReason::SeqGap.as_str(), "seq_gap");
         assert_eq!(VerifyReason::HeadMismatch.as_str(), "head_mismatch");
     }
@@ -460,14 +504,25 @@ mod tests {
 
         let mut changed_id = original.event.clone();
         changed_id.id = EventId::new();
-        assert_ne!(original_hash, chain_hash(&GENESIS_HASH, &changed_id).expect("hashes"));
+        assert_ne!(
+            original_hash,
+            chain_hash(&GENESIS_HASH, &changed_id).expect("hashes")
+        );
 
         let mut changed_chain = original.event.clone();
-        changed_chain.actor_chain.push(AuditActor::tool("list_notes"));
-        assert_ne!(original_hash, chain_hash(&GENESIS_HASH, &changed_chain).expect("hashes"));
+        changed_chain
+            .actor_chain
+            .push(AuditActor::tool("list_notes"));
+        assert_ne!(
+            original_hash,
+            chain_hash(&GENESIS_HASH, &changed_chain).expect("hashes")
+        );
 
         let mut changed_subject = original.event.clone();
         changed_subject.subject.id = Some("other".into());
-        assert_ne!(original_hash, chain_hash(&GENESIS_HASH, &changed_subject).expect("hashes"));
+        assert_ne!(
+            original_hash,
+            chain_hash(&GENESIS_HASH, &changed_subject).expect("hashes")
+        );
     }
 }

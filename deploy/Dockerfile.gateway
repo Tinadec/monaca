@@ -14,11 +14,16 @@ WORKDIR /home/bun/app
 
 # The lockfile is the contract for actual versions (§11.2). The bun cache is a cache mount so
 # a source-only change does not re-download the tree.
-COPY --chown=bun:bun package.json bun.lock ./
+#
+# The whole source tree is copied BEFORE the install on purpose: the root manifest's
+# `workspaces` list names members (`packages/*`, `modules/*`, `apps/*`, `scripts`), and
+# `bun install` resolves workspace dependencies against those directories — installing from
+# the root manifest alone fails with "Workspace not found". The two-stage copy that used to
+# live here could not work once the workspace grew members the root manifest points at.
+COPY --chown=bun:bun . .
+
 RUN --mount=type=cache,target=/home/bun/.bun/install/cache,sharing=locked,uid=1000,gid=1000 \
     bun install --frozen-lockfile
-
-COPY --chown=bun:bun . .
 
 # A .node binding is a rust.yml artifact, not an npm package (§2.4), so it is only present
 # when image.yml managed to fetch one. Absent, @monaca/core throws MONACA_CORE_BINARY_MISSING

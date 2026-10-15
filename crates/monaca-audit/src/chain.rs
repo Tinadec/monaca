@@ -30,10 +30,7 @@ pub fn canonical_bytes(event: &AuditEvent) -> Result<Vec<u8>, CanonicalizeError>
 /// The digest of `event` chained onto `prev`.
 ///
 /// `prev` is the raw 32-byte digest of the previous event, or [`GENESIS_HASH`] for the first.
-pub fn chain_hash(
-    prev: &[u8; 32],
-    event: &AuditEvent,
-) -> Result<[u8; 32], CanonicalizeError> {
+pub fn chain_hash(prev: &[u8; 32], event: &AuditEvent) -> Result<[u8; 32], CanonicalizeError> {
     let jcs = canonical_bytes(event)?;
     let mut hasher = Sha256::new();
     hasher.update(prev);
@@ -74,7 +71,10 @@ mod tests {
             at: OffsetDateTime::from_unix_timestamp(1_767_225_600).expect("timestamp"),
             action: action.into(),
             actor_chain: vec![AuditActor::account(AccountId::new())],
-            subject: AuditSubject { subject_type: AuditActorType::Tool, id: None },
+            subject: AuditSubject {
+                subject_type: AuditActorType::Tool,
+                id: None,
+            },
             decision: AuditDecision::Allow,
             grant_id: None,
             jti: None,
@@ -97,7 +97,10 @@ mod tests {
             .expect("hashes");
         let text = hash_hex(&digest);
         assert_eq!(text.len(), 64);
-        assert!(text.chars().all(|ch| ch.is_ascii_digit() || ('a'..='f').contains(&ch)));
+        assert!(
+            text.chars()
+                .all(|ch| ch.is_ascii_digit() || ('a'..='f').contains(&ch))
+        );
         assert_eq!(text, text.to_lowercase());
     }
 
@@ -164,11 +167,17 @@ mod tests {
 
         let mut different_action = original.clone();
         different_action.action = "tool.denied".into();
-        assert_ne!(baseline, chain_hash(&GENESIS_HASH, &different_action).expect("hashes"));
+        assert_ne!(
+            baseline,
+            chain_hash(&GENESIS_HASH, &different_action).expect("hashes")
+        );
 
         let mut different_decision = original.clone();
         different_decision.decision = AuditDecision::Deny;
-        assert_ne!(baseline, chain_hash(&GENESIS_HASH, &different_decision).expect("hashes"));
+        assert_ne!(
+            baseline,
+            chain_hash(&GENESIS_HASH, &different_decision).expect("hashes")
+        );
     }
 
     /// The digest is over the raw previous bytes, not their hex: hashing the hex spelling gives a
@@ -185,7 +194,10 @@ mod tests {
         let mut from_hex = [0u8; 32];
         from_hex.copy_from_slice(hasher.finalize().as_slice());
 
-        assert_ne!(raw, from_hex, "the hex spelling must not produce the same digest");
+        assert_ne!(
+            raw, from_hex,
+            "the hex spelling must not produce the same digest"
+        );
     }
 
     #[test]

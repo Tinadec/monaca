@@ -23,5 +23,16 @@ napi-derive = { workspace = true }
 [build-dependencies]
 napi-build = { workspace = true }
 
-[lints]
-workspace = true
+# The workspace forbids `unsafe_code`; this crate is the one place that cannot comply. napi-rs
+# v3's `#[napi]` expansion emits its module registration (the ctor blocks and FFI shims) with
+# `#[allow(unsafe_code)]` around genuinely unsafe code, and a `forbid` cannot be relaxed by an
+# `allow` — not even from a macro. A member's [lints] table replaces the workspace's wholesale,
+# so the rest of the workspace's set is re-declared here unchanged.
+[lints.rust]
+unsafe_code = "allow"
+unused_must_use = "deny"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "warn"
+unwrap_used = "warn"

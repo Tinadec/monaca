@@ -116,7 +116,9 @@ pub fn encode_suffix(uuid: Uuid) -> String {
     // 26 * 5 = 130 bits, so the top three symbols' high bits are padding. A u128 shifted right
     // 130 times is zero, and the loop above only reads 26 * 5 = 130 bits out of a 128-bit value,
     // which is exactly the TypeID encoding.
-    std::str::from_utf8(&out).expect("the alphabet is ASCII").to_owned()
+    std::str::from_utf8(&out)
+        .expect("the alphabet is ASCII")
+        .to_owned()
 }
 
 /// Decode a 26-symbol TypeID v0.3 suffix into its UUID.
@@ -144,7 +146,10 @@ pub fn decode_suffix(suffix: &str) -> Result<Uuid, TypedIdError> {
 }
 
 fn alphabet_index(byte: u8) -> Option<u8> {
-    ALPHABET.iter().position(|candidate| *candidate == byte).map(|index| index as u8)
+    ALPHABET
+        .iter()
+        .position(|candidate| *candidate == byte)
+        .map(|index| index as u8)
 }
 
 fn split(input: &str) -> Result<(&str, &str), TypedIdError> {
@@ -161,8 +166,19 @@ fn split(input: &str) -> Result<(&str, &str), TypedIdError> {
 fn is_known_prefix(prefix: &str) -> bool {
     matches!(
         prefix,
-        "ten" | "org" | "acc" | "agt" | "akey" | "grt" | "cli" | "ses" | "evt" | "dlg" | "apr"
-            | "int" | "key"
+        "ten"
+            | "org"
+            | "acc"
+            | "agt"
+            | "akey"
+            | "grt"
+            | "cli"
+            | "ses"
+            | "evt"
+            | "dlg"
+            | "apr"
+            | "int"
+            | "key"
     )
 }
 
@@ -318,9 +334,18 @@ mod tests {
     /// §5.2's vectors. Both implementations (this one and `packages/core`'s `bigint` loop)
     /// must pass them, so they are asserted here verbatim.
     const VECTORS: &[(&str, &str)] = &[
-        ("00000000-0000-0000-0000-000000000000", "00000000000000000000000000"),
-        ("01890a5d-ac96-774b-bcce-b302099a8057", "01h455vb4pex5vsknk084sn02q"),
-        ("ffffffff-ffff-ffff-ffff-ffffffffffff", "7zzzzzzzzzzzzzzzzzzzzzzzzz"),
+        (
+            "00000000-0000-0000-0000-000000000000",
+            "00000000000000000000000000",
+        ),
+        (
+            "01890a5d-ac96-774b-bcce-b302099a8057",
+            "01h455vb4pex5vsknk084sn02q",
+        ),
+        (
+            "ffffffff-ffff-ffff-ffff-ffffffffffff",
+            "7zzzzzzzzzzzzzzzzzzzzzzzzz",
+        ),
     ];
 
     #[test]
@@ -335,7 +360,10 @@ mod tests {
     fn suffix_round_trips_every_vector() {
         for (uuid, suffix) in VECTORS {
             let parsed = Uuid::parse_str(uuid).expect("vector uuid parses");
-            assert_eq!(decode_suffix(suffix).expect("vector suffix decodes"), parsed);
+            assert_eq!(
+                decode_suffix(suffix).expect("vector suffix decodes"),
+                parsed
+            );
         }
     }
 
@@ -368,7 +396,10 @@ mod tests {
         let err = OrgId::parse(&text).expect_err("prefix mismatch must fail");
         assert_eq!(
             err,
-            TypedIdError::WrongPrefix { expected: "org".to_owned(), found: "ten".to_owned() }
+            TypedIdError::WrongPrefix {
+                expected: "org".to_owned(),
+                found: "ten".to_owned()
+            }
         );
     }
 
@@ -381,7 +412,10 @@ mod tests {
     #[test]
     fn malformed_suffixes_are_rejected() {
         // Wrong length.
-        assert_eq!(TenantId::parse("ten_abc").expect_err("short"), TypedIdError::Length(3));
+        assert_eq!(
+            TenantId::parse("ten_abc").expect_err("short"),
+            TypedIdError::Length(3)
+        );
         // A symbol outside the alphabet (`i`, `l`, `o`, `u` are excluded on purpose).
         assert_eq!(
             TenantId::parse("ten_i1h455vb4pex5vsknk084sn02").expect_err("bad symbol"),
@@ -393,8 +427,14 @@ mod tests {
             TypedIdError::Padding
         );
         // No separator at all.
-        assert_eq!(TenantId::parse("ten").expect_err("shape"), TypedIdError::Shape);
-        assert_eq!(TenantId::parse("_x").expect_err("empty prefix"), TypedIdError::Shape);
+        assert_eq!(
+            TenantId::parse("ten").expect_err("shape"),
+            TypedIdError::Shape
+        );
+        assert_eq!(
+            TenantId::parse("_x").expect_err("empty prefix"),
+            TypedIdError::Shape
+        );
     }
 
     #[test]

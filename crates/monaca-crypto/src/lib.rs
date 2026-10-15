@@ -66,8 +66,16 @@ mod tests {
 
     #[test]
     fn errors_render_a_useful_message() {
-        assert!(CryptoError::TenantKeyMissing.to_string().contains("data-encryption key"));
-        assert!(CryptoError::PasswordMismatch.to_string().contains("does not match"));
+        assert!(
+            CryptoError::TenantKeyMissing
+                .to_string()
+                .contains("data-encryption key")
+        );
+        assert!(
+            CryptoError::PasswordMismatch
+                .to_string()
+                .contains("does not match")
+        );
     }
 
     /// The trait is object-safe, which is what lets a deployment pick a provider at runtime.

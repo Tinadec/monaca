@@ -66,7 +66,10 @@ pub struct TokenError {
 impl TokenError {
     /// Build an error from a code and a detail.
     pub fn new(code: ErrorCode, detail: impl Into<String>) -> Self {
-        Self { code, detail: detail.into() }
+        Self {
+            code,
+            detail: detail.into(),
+        }
     }
 
     /// The `MONACA_*` string.
@@ -98,12 +101,27 @@ mod tests {
     fn codes_match_the_contract_table() {
         assert_eq!(ErrorCode::Malformed.as_str(), "MONACA_TOKEN_MALFORMED");
         assert_eq!(ErrorCode::UnknownKid.as_str(), "MONACA_TOKEN_UNKNOWN_KID");
-        assert_eq!(ErrorCode::InvalidSignature.as_str(), "MONACA_TOKEN_INVALID_SIGNATURE");
+        assert_eq!(
+            ErrorCode::InvalidSignature.as_str(),
+            "MONACA_TOKEN_INVALID_SIGNATURE"
+        );
         assert_eq!(ErrorCode::Expired.as_str(), "MONACA_TOKEN_EXPIRED");
-        assert_eq!(ErrorCode::NotYetValid.as_str(), "MONACA_TOKEN_NOT_YET_VALID");
-        assert_eq!(ErrorCode::IssuerMismatch.as_str(), "MONACA_TOKEN_ISSUER_MISMATCH");
-        assert_eq!(ErrorCode::AudienceMismatch.as_str(), "MONACA_TOKEN_AUDIENCE_MISMATCH");
-        assert_eq!(ErrorCode::ClaimsInvalid.as_str(), "MONACA_TOKEN_CLAIMS_INVALID");
+        assert_eq!(
+            ErrorCode::NotYetValid.as_str(),
+            "MONACA_TOKEN_NOT_YET_VALID"
+        );
+        assert_eq!(
+            ErrorCode::IssuerMismatch.as_str(),
+            "MONACA_TOKEN_ISSUER_MISMATCH"
+        );
+        assert_eq!(
+            ErrorCode::AudienceMismatch.as_str(),
+            "MONACA_TOKEN_AUDIENCE_MISMATCH"
+        );
+        assert_eq!(
+            ErrorCode::ClaimsInvalid.as_str(),
+            "MONACA_TOKEN_CLAIMS_INVALID"
+        );
         assert_eq!(ErrorCode::JwksInvalid.as_str(), "MONACA_JWKS_INVALID");
     }
 
