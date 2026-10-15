@@ -211,29 +211,31 @@ mod node_symbol_stubs {
     use std::ffi::c_void;
 
     use napi::sys::{
-        napi_env, napi_ref, napi_status, napi_threadsafe_function,
-        napi_threadsafe_function_call_mode, Status,
+        Status, napi_env, napi_ref, napi_status, napi_threadsafe_function,
+        napi_threadsafe_function_call_mode,
     };
 
     /// napi_reference_unref — report a zero count: there is no reference to unref.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub unsafe extern "C" fn napi_reference_unref(
         _env: napi_env,
         _ref: napi_ref,
         result: *mut u32,
     ) -> napi_status {
         if !result.is_null() {
-            *result = 0;
+            unsafe {
+                *result = 0;
+            }
         }
         Status::napi_ok
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub unsafe extern "C" fn napi_delete_reference(_env: napi_env, _ref: napi_ref) -> napi_status {
         Status::napi_ok
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub unsafe extern "C" fn napi_call_threadsafe_function(
         _func: napi_threadsafe_function,
         _data: *mut c_void,

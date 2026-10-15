@@ -1,0 +1,95 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Monaca",
+    "description": "Identity and access management for the AI-agent era.",
+    "contact": {
+      "name": "Monaca contributors"
+    },
+    "license": {
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
+    },
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Liveness",
+        "description": "Always 200 with {\"status\":\"ok\"} while the process can serve.",
+        "operationId": "healthz",
+        "responses": {
+          "200": {
+            "description": "The server is alive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Build version",
+        "operationId": "version",
+        "responses": {
+          "200": {
+            "description": "The binary's name and version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "description": "The `/healthz` body — §6.1.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Always `\"ok\"`; the endpoint does not answer otherwise."
+          }
+        }
+      },
+      "VersionResponse": {
+        "type": "object",
+        "description": "The `/version` body.",
+        "required": [
+          "name",
+          "version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The binary's package name."
+          },
+          "version": {
+            "type": "string",
+            "description": "The version it was built from."
+          }
+        }
+      }
+    }
+  }
+}
