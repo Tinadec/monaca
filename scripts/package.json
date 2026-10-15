@@ -1,0 +1,18 @@
+{
+  "name": "@monaca/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev orchestration, spikes and the e2e acceptance script — a workspace member so they can import the workspace packages",
+  "type": "module",
+  "dependencies": {
+    "@monaca/kernel": "workspace:*",
+    "@monaca/mcp": "workspace:*",
+    "@monaca/module-mcp-demo": "workspace:*"
+  },
+  "devDependencies": {
+    "@monaca/tsconfig": "workspace:*",
+    "@types/bun": "^1.4.3",
+    "jose": "^6.2.12",
+    "typescript": "^6.0.3"
+  }
+}

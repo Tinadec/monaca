@@ -5,9 +5,6 @@
     "": {
       "name": "monaca",
       "devDependencies": {
-        "@monaca/kernel": "workspace:*",
-        "@monaca/mcp": "workspace:*",
-        "@monaca/module-mcp-demo": "workspace:*",
         "@types/bun": "^1.4.3",
         "embedded-postgres": "^18.4.0-beta.17",
         "jose": "^6.2.12",
@@ -21,6 +18,7 @@
         "@monaca/ui": "workspace:*",
         "@tanstack/vue-query": "^5.104.2",
         "@vee-validate/zod": "^4.15.1",
+        "lucide-vue-next": "^1.0.0",
         "vee-validate": "^4.15.1",
         "vue": "^3.5.44",
         "vue-router": "^5.4.0",
@@ -155,6 +153,21 @@
         "vue-tsc": "^3.3.13",
       },
     },
+    "scripts": {
+      "name": "@monaca/scripts",
+      "version": "0.0.0",
+      "dependencies": {
+        "@monaca/kernel": "workspace:*",
+        "@monaca/mcp": "workspace:*",
+        "@monaca/module-mcp-demo": "workspace:*",
+      },
+      "devDependencies": {
+        "@monaca/tsconfig": "workspace:*",
+        "@types/bun": "^1.4.3",
+        "jose": "^6.2.12",
+        "typescript": "^6.0.3",
+      },
+    },
   },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
@@ -260,6 +273,8 @@
     "@monaca/mcp": ["@monaca/mcp@workspace:packages/mcp"],
 
     "@monaca/module-mcp-demo": ["@monaca/module-mcp-demo@workspace:modules/mcp-demo"],
+
+    "@monaca/scripts": ["@monaca/scripts@workspace:scripts"],
 
     "@monaca/sdk": ["@monaca/sdk@workspace:packages/sdk"],
 

@@ -7,7 +7,8 @@
   "workspaces": [
     "packages/*",
     "modules/*",
-    "apps/*"
+    "apps/*",
+    "scripts"
   ],
   "engines": {
     "bun": ">=1.3.0"
@@ -22,9 +23,6 @@
     "build": "bun run --filter '*' build"
   },
   "devDependencies": {
-    "@monaca/kernel": "workspace:*",
-    "@monaca/mcp": "workspace:*",
-    "@monaca/module-mcp-demo": "workspace:*",
     "@types/bun": "^1.4.3",
     "embedded-postgres": "^18.4.0-beta.17",
     "jose": "^6.2.12",

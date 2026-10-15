@@ -13,11 +13,13 @@ name: rust
 on:
   push:
     branches: [main]
-    paths-ignore: &skip-non-rust
+    paths-ignore:
       - "docs/**"
       - "**/*.md"
   pull_request:
-    paths-ignore: *skip-non-rust
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   workflow_dispatch:
 
 # A docs-only change never reaches this workflow. A TS-only change does, when it is pushed
@@ -335,6 +337,29 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+    # Job-level env so every step below inherits it. Deliberately no YAML anchors or merge
+    # keys: GitHub's workflow parser rejects `<<` at file level, and an alias that only
+    # works until someone adds a second key is a trap. `MONACA_E2E_BASE_URL` is unused by
+    # the early steps; it is here so the acceptance script's target is declared once.
+    env:
+      MONACA_ENV: ci
+      MONACA_SERVER_ADDR: 127.0.0.1:8081
+      MONACA_SERVER_URL: http://127.0.0.1:8081
+      MONACA_PUBLIC_BASE_URL: http://localhost:8080
+      MONACA_AUTH_UI_URL: http://localhost:5174
+      MONACA_CONTROL_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/monaca_control
+      MONACA_ADMIN_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+      MONACA_APP_DB_USER: monaca_app
+      MONACA_APP_DB_PASSWORD: monaca_app_ci
+      MONACA_DEV_KEK: "00000000000000000000000000000000000000000000000000000000000000ff"
+      MONACA_INTERNAL_SECRET: ci-internal-secret
+      MONACA_BOOTSTRAP_ADMIN_EMAIL: admin@demo.localhost
+      MONACA_BOOTSTRAP_ADMIN_PASSWORD: monaca-ci-password
+      MONACA_BOOTSTRAP_ADMIN_CLIENT_SECRET: ci-admin-client-secret
+      MONACA_CONSOLE_CLIENT_SECRET: ci-console-client-secret
+      MONACA_MCP_DEMO_RESOURCE: http://localhost:8080/mcp/demo
+      MONACA_LOG_LEVEL: info
+      MONACA_E2E_BASE_URL: http://localhost:8080
     steps:
       - uses: actions/checkout@v4
 
@@ -368,30 +393,11 @@ jobs:
         run: chmod +x .monaca/bin/monaca-server
 
       - name: Migrate and bootstrap the CI database
-        env: &e2e-env
-          MONACA_ENV: ci
-          MONACA_SERVER_ADDR: 127.0.0.1:8081
-          MONACA_SERVER_URL: http://127.0.0.1:8081
-          MONACA_PUBLIC_BASE_URL: http://localhost:8080
-          MONACA_AUTH_UI_URL: http://localhost:5174
-          MONACA_CONTROL_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/monaca_control
-          MONACA_ADMIN_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
-          MONACA_APP_DB_USER: monaca_app
-          MONACA_APP_DB_PASSWORD: monaca_app_ci
-          MONACA_DEV_KEK: 00000000000000000000000000000000000000000000000000000000000000ff
-          MONACA_INTERNAL_SECRET: ci-internal-secret
-          MONACA_BOOTSTRAP_ADMIN_EMAIL: admin@demo.localhost
-          MONACA_BOOTSTRAP_ADMIN_PASSWORD: monaca-ci-password
-          MONACA_BOOTSTRAP_ADMIN_CLIENT_SECRET: ci-admin-client-secret
-          MONACA_CONSOLE_CLIENT_SECRET: ci-console-client-secret
-          MONACA_MCP_DEMO_RESOURCE: http://localhost:8080/mcp/demo
-          MONACA_LOG_LEVEL: info
         run: |
           .monaca/bin/monaca-server migrate
           .monaca/bin/monaca-server bootstrap
 
       - name: Stage 0 — start the server and wait for /healthz
-        env: *e2e-env
         run: |
           mkdir -p .monaca/reports
           .monaca/bin/monaca-server serve > .monaca/server.log 2>&1 &
@@ -408,9 +414,6 @@ jobs:
           exit 1
 
       - name: Stage 1 — bun run e2e:skeleton
-        env:
-          <<: *e2e-env
-          MONACA_E2E_BASE_URL: http://localhost:8080
         run: |
           if [ ! -f scripts/e2e/skeleton.ts ]; then
             echo "::warning::scripts/e2e/skeleton.ts does not exist yet; skipping the acceptance script"
