@@ -8,7 +8,9 @@
 //! use of jsonwebtoken cannot make a test agree with itself.
 
 use data_encoding::BASE64URL_NOPAD;
-use monaca_core::{DEFAULT_CLOCK_SKEW_SECS, ErrorCode, Verifier, VerifierOptions, scope_satisfies};
+use monaca_core::{
+    DEFAULT_CLOCK_SKEW_SECS, ErrorCode, VERSION, Verifier, VerifierOptions, scope_satisfies,
+};
 use monaca_types::FixedClock;
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};

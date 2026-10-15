@@ -202,6 +202,9 @@ jobs:
         working-directory: packages/core
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
+        # bash explicitly: the backslash line continuations below are shell syntax that
+        # PowerShell (the windows-latest default) rejects with a ParserError.
+        shell: bash
         run: |
           bun run build -- \
             --target ${{ matrix.target }} \
@@ -277,6 +280,12 @@ jobs:
       # Bootstrap policy (§10.6): the hand-written placeholder in packages/core/index.d.ts
       # is expected to differ from the first generated copy, so a diff WARNS until the
       # generated version is committed; on main afterwards it fails.
+      #
+      # The failure is deliberately the LAST step: staging and uploading the artifact come
+      # first and run with `if: always()`, so a drifting main still produces the `codegen`
+      # artifact — the same "always record it" pattern the rustfmt-patch upload uses. Without
+      # that, the first bootstrap (commit the generated files via `bun run fetch:native`)
+      # could never happen, because the artifact would not exist until the check passed.
       - name: Drift check (generated files vs committed)
         id: drift
         shell: bash
@@ -291,13 +300,8 @@ jobs:
             echo "::warning::generated files drifted; refresh them with: bun run fetch:native"
           fi
 
-      - name: Fail when main has drifted
-        if: steps.drift.outputs.drifted == '1' && github.ref == 'refs/heads/main'
-        run: |
-          echo "::error::generated files are out of date on main; run: bun run fetch:native"
-          exit 1
-
       - name: Stage the codegen artifact
+        if: always()
         run: |
           mkdir -p codegen-out
           cp packages/core/index.d.ts codegen-out/index.d.ts
@@ -306,12 +310,19 @@ jobs:
           cp spec/events/*.json codegen-out/events/
 
       - name: Upload codegen
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: codegen
           path: codegen-out/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: Fail when main has drifted
+        if: always() && steps.drift.outputs.drifted == '1' && github.ref == 'refs/heads/main'
+        run: |
+          echo "::error::generated files are out of date on main; run: bun run fetch:native"
+          exit 1
 
   # ---------------------------------------------------------------------------------------
   # Stage 0: the built server starts and answers /healthz. Stage 1: the acceptance script.
