@@ -127,7 +127,7 @@ async fn shutdown_signal() {
 }
 
 #[cfg(test)]
-mod tests {
+mod addr_tests {
     use super::*;
 
     #[test]

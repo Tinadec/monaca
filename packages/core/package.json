@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "build": "napi build --release --platform --no-js --dts index.d.ts",
+    "build": "napi build --release --platform --no-js --dts index.d.ts --manifest-path ../../crates/monaca-napi/Cargo.toml",
     "typecheck": "tsc -p tsconfig.json",
     "test": "bun test --pass-with-no-tests"
   },

@@ -3,6 +3,10 @@
 #
 # Contract: docs/contracts/m0.md §10.2. TypeScript 6.0.3 is pinned deliberately (§11.2) —
 # vue-tsc 3.3.13 needs `typescript/lib/tsc`, which TypeScript 7 no longer exports.
+#
+# `bun run build` excludes @monaca/core on purpose: its build script is a `napi build`, which
+# needs a Rust toolchain this runner does not have (and dev machines do not either, §2). The
+# native module is rust.yml's job — codegen and the build matrix compile it there.
 name: web
 
 on:
